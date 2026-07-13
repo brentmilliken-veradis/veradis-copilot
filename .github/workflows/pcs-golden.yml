@@ -1,0 +1,40 @@
+# §13 golden gate — every PR is diffed against the pinned NumPy reference
+# outputs. The golden carries only contract-precision values (2 dp round-half-
+# even; see docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md),
+# so regeneration is platform-independent and this job runs on stock Linux.
+
+name: pcs-golden
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          npm ci
+          pip install numpy==2.0.2
+
+      - name: Regenerate golden from the NumPy reference and diff
+        run: |
+          python tools/reference/pcs_reference.py --golden > /dev/null
+          git diff --exit-code tests/golden/pcs-golden-v21.json tests/golden/pcs-golden-v21.sha256
+
+      - name: Engine conformance (vitest — golden + layered RNG parity)
+        run: npx vitest run packages/pcs-core
+
+      - name: Full suite
+        run: npx vitest run
