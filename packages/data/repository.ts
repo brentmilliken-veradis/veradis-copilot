@@ -83,7 +83,44 @@ export interface Repository {
   addCorpusDocument(input: NewCorpusDocument): Promise<CorpusDocument>;
   addCorpusChunk(input: NewCorpusChunk): Promise<CorpusChunk>;
   listCorpusChunks(category: Category): Promise<CorpusChunk[]>;
+
+  // orders (Tally intake) — tallySubmissionId is the webhook dedupe key
+  createOrder(input: NewOrder): Promise<Order>;
+  getOrder(orderId: string): Promise<Order | null>;
+  getOrderByTallySubmission(submissionId: string): Promise<Order | null>;
+
+  // outbound email log (EMAIL A/B/C audit trail)
+  recordEmail(input: NewEmailRecord): Promise<EmailRecord>;
+  listEmails(orderId: string): Promise<EmailRecord[]>;
 }
+
+/** A paid Tally submission — the commercial side of a report. */
+export interface Order {
+  id: string;
+  tallySubmissionId: string;
+  email: string;
+  ownerName: string | null;
+  category: Category;
+  sku: "verify" | "appraise";
+  createdAt: string;
+}
+
+export type NewOrder = Omit<Order, "createdAt">;
+
+export type EmailKind = "received" | "curator_review" | "definitive";
+
+export interface EmailRecord {
+  id: string;
+  orderId: string;
+  reportId: string | null;
+  kind: EmailKind;
+  to: string;
+  subject: string;
+  providerId: string;
+  sentAt: string;
+}
+
+export type NewEmailRecord = Omit<EmailRecord, "id" | "sentAt">;
 
 /** Injectable clock + id source so tests are deterministic. */
 export interface RepoEnv {

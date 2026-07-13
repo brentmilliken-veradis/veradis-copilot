@@ -3,6 +3,7 @@
 
 import { getStore } from "@/app/lib/store";
 import { confirmReport } from "@/packages/curator/confirm";
+import { sendDefinitive } from "@/packages/notify/emails";
 import type { CredentialClass, CuratorVerb, Tier } from "@/packages/pcs-types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "reportId and verb are required" }, { status: 400 });
   }
 
-  const { repo } = await getStore();
+  const { repo, emailer } = await getStore();
   try {
     const res = await confirmReport(repo, {
       reportId: body.reportId,
@@ -33,6 +34,11 @@ export async function POST(request: Request) {
       verb: body.verb,
       downgradeTo: body.downgradeTo,
     });
+    // EMAIL C — the report is definitive; tell the customer, with the link.
+    if (res.report.status === "definitive") {
+      const order = await repo.getOrder(res.report.orderId);
+      if (order) await sendDefinitive(repo, emailer, order, res.report.id);
+    }
     return Response.json({
       report: res.report,
       action: res.action,

@@ -18,6 +18,10 @@ import type {
 import type {
   Repository,
   RepoEnv,
+  Order,
+  NewOrder,
+  EmailRecord,
+  NewEmailRecord,
   NewReport,
   NewReportVersion,
   NewEvidenceItem,
@@ -46,8 +50,37 @@ export class InMemoryRepository implements Repository {
   private profiles: CategoryProfileRow[] = [];
   private corpusDocs: CorpusDocument[] = [];
   private corpusChunks: CorpusChunk[] = [];
+  private orders = new Map<string, Order>();
+  private emails: EmailRecord[] = [];
 
   constructor(private env: RepoEnv = defaultEnv) {}
+
+  async createOrder(input: NewOrder): Promise<Order> {
+    const order: Order = { ...input, createdAt: this.env.now() };
+    this.orders.set(order.id, order);
+    return order;
+  }
+
+  async getOrder(orderId: string): Promise<Order | null> {
+    return this.orders.get(orderId) ?? null;
+  }
+
+  async getOrderByTallySubmission(submissionId: string): Promise<Order | null> {
+    for (const o of this.orders.values()) {
+      if (o.tallySubmissionId === submissionId) return o;
+    }
+    return null;
+  }
+
+  async recordEmail(input: NewEmailRecord): Promise<EmailRecord> {
+    const rec: EmailRecord = { ...input, id: this.env.id(), sentAt: this.env.now() };
+    this.emails.push(rec);
+    return rec;
+  }
+
+  async listEmails(orderId: string): Promise<EmailRecord[]> {
+    return this.emails.filter((e) => e.orderId === orderId);
+  }
 
   async createReport(input: NewReport): Promise<Report> {
     const report: Report = {

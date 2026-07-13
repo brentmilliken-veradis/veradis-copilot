@@ -7,10 +7,33 @@
 import { InMemoryRepository } from "@/packages/data/in-memory";
 import { buildCoin2007 } from "@/packages/fixtures/coin-2007";
 import type { Repository } from "@/packages/data/repository";
+import { StubStorage, type Storage } from "@/packages/adapters/storage";
+import { getEmailer, type Emailer } from "@/packages/adapters/email";
+import { getVisionAdapter } from "@/packages/adapters/vision";
+import { pcgsAdapter, numistaAdapter } from "@/packages/adapters/source";
+import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
+import { StubGraphAdapter } from "@/packages/adapters/graph";
+import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
+import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
+import type { PipelineAdapters } from "@/packages/pipeline/run";
 
 export interface AppStore {
   repo: Repository;
+  storage: Storage;
+  emailer: Emailer;
+  adapters: PipelineAdapters;
   seededReportId: string;
+}
+
+function buildAdapters(): PipelineAdapters {
+  return {
+    vision: getVisionAdapter(),
+    sources: [pcgsAdapter(), numistaAdapter()],
+    embedder: new StubEmbeddingAdapter(),
+    graph: new StubGraphAdapter(),
+    sanctions: new StubSanctionsAdapter(),
+    narrative: new StubNarrativeAdapter(),
+  };
 }
 
 async function seed(): Promise<AppStore> {
@@ -30,7 +53,7 @@ async function seed(): Promise<AppStore> {
     ciHi: snap.score.ci.hi,
     pdfPath: null,
   });
-  return { repo, seededReportId: report.id };
+  return { repo, storage: new StubStorage(), emailer: getEmailer(), adapters: buildAdapters(), seededReportId: report.id };
 }
 
 const g = globalThis as unknown as { __veradisStore?: Promise<AppStore> };
