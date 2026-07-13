@@ -70,7 +70,7 @@ export class InMemoryRepository implements Repository {
 
   async updateReport(
     id: string,
-    patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId">>,
+    patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,
   ): Promise<Report> {
     const r = this.reports.get(id);
     if (!r) throw new Error(`report ${id} not found`);
@@ -101,6 +101,16 @@ export class InMemoryRepository implements Repository {
   async addEvidence(input: NewEvidenceItem): Promise<EvidenceItem> {
     const e: EvidenceItem = { ...input, id: this.env.id() };
     this.evidence.push(e);
+    return { ...e };
+  }
+
+  async updateEvidence(
+    id: string,
+    patch: Partial<Pick<EvidenceItem, "c2paState" | "exifTs" | "slot">>,
+  ): Promise<EvidenceItem> {
+    const e = this.evidence.find((x) => x.id === id);
+    if (!e) throw new Error(`evidence ${id} not found`);
+    Object.assign(e, patch);
     return { ...e };
   }
 

@@ -42,7 +42,7 @@ export interface Repository {
   getReport(id: string): Promise<Report | null>;
   updateReport(
     id: string,
-    patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId">>,
+    patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,
   ): Promise<Report>;
   listReports(): Promise<Report[]>;
 
@@ -53,6 +53,10 @@ export interface Repository {
 
   // evidence
   addEvidence(input: NewEvidenceItem): Promise<EvidenceItem>;
+  updateEvidence(
+    id: string,
+    patch: Partial<Pick<EvidenceItem, "c2paState" | "exifTs" | "slot">>,
+  ): Promise<EvidenceItem>;
   listEvidence(reportId: string): Promise<EvidenceItem[]>;
 
   // checks

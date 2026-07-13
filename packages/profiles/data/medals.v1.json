@@ -1,0 +1,33 @@
+{
+  "category": "medals",
+  "version": 1,
+  "label": "Medals & militaria (UK / Commonwealth)",
+  "identityKeys": [
+    { "key": "naming", "label": "Rim naming (rank/name/unit)", "weight": 0.35 },
+    { "key": "rank", "label": "Rank", "weight": 0.1 },
+    { "key": "unit", "label": "Regiment / unit", "weight": 0.2 },
+    { "key": "campaign", "label": "Campaign / award", "weight": 0.2 },
+    { "key": "gazette", "label": "Gazette entry", "weight": 0.15 }
+  ],
+  "identityNeverKeys": ["serial"],
+  "captureSlots": [
+    { "slotId": "obverse", "label": "Obverse (per medal)", "guidance": "Each medal, obverse.", "requiredFor": "identity", "core": true },
+    { "slotId": "reverse", "label": "Reverse (per medal)", "guidance": "Each medal, reverse.", "requiredFor": "identity", "core": true },
+    { "slotId": "suspension_naming", "label": "Suspension / naming", "guidance": "Rim naming, raked light.", "requiredFor": "identity", "core": true, "unlocks": ["roll_match"] },
+    { "slotId": "group_layout", "label": "Group layout", "guidance": "Full group as mounted.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "renamed", "label": "Renamed", "description": "Original naming erased and re-cut to a different recipient." },
+    { "key": "copy_striking", "label": "Copy striking", "description": "Later restrike / copy rather than an original issue." },
+    { "key": "wrong_naming_style", "label": "Wrong naming style", "description": "Naming font/impressing inconsistent with the issuing period." }
+  ],
+  "corpusSources": [
+    { "name": "The London Gazette", "tier": 1, "role": "ground_truth", "url": "https://www.thegazette.co.uk" },
+    { "name": "Veterans Affairs Canada (VAC) Virtual War Memorial", "tier": 1, "role": "ground_truth", "url": "https://www.veterans.gc.ca" },
+    { "name": "TNA Discovery", "tier": 2, "role": "corroboration", "url": "https://discovery.nationalarchives.gov.uk" },
+    { "name": "CWGC", "tier": 2, "role": "corroboration", "url": "https://www.cwgc.org" },
+    { "name": "Noonans (DNW) archive", "tier": 2, "role": "corroboration", "url": "https://www.noonans.co.uk" }
+  ],
+  "compKeys": ["recipient_class", "campaign", "group_completeness"],
+  "materialSlotClass": "naming_and_strike"
+}

@@ -6,9 +6,11 @@
 import type { Category, CategoryProfile, Quadrant } from "@/packages/pcs-types";
 import type { Repository } from "@/packages/data/repository";
 import coinsV1 from "./data/coins.v1.json";
+import medalsV1 from "./data/medals.v1.json";
 
-/** Registry of built-in profiles, keyed by `${category}@${version}`. */
-const REGISTRY: CategoryProfile[] = [coinsV1 as CategoryProfile];
+/** Registry of built-in profiles. Coins is the Phase A engine-prover; a minimal
+ *  Medals profile keeps the engine genuinely category-agnostic (P1 build). */
+const REGISTRY: CategoryProfile[] = [coinsV1 as CategoryProfile, medalsV1 as CategoryProfile];
 
 const VALID_QUADRANTS: ReadonlySet<Quadrant> = new Set<Quadrant>([
   "identity",
