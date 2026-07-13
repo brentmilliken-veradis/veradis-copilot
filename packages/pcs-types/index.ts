@@ -11,4 +11,5 @@
 export * from "./domain";
 export * from "./profiles";
 export * from "./scoring";
+export * from "./scoring-inputs";
 export * from "./snapshot";
