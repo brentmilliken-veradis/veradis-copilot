@@ -1,5 +1,5 @@
 {
- "binding_scenario": "UNDECIDED \u2014 awaiting Head-of-Intelligence sign-off",
+ "binding_scenario": "B \u2014 count-based n_eff, ratified by Head of Intelligence 13 Jul 2026 (see docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md)",
  "cases": {
   "12.1": {
    "composite_algebraic": 93.35,
@@ -12,11 +12,10 @@
     "tier": "gold"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 96.69513417477995,
-     "level": 0.95,
-     "lo": 78.89160036529579,
-     "point": 89.41313036760812
+    "ci_2dp": {
+     "hi": 96.7,
+     "lo": 78.89,
+     "point": 89.41
     },
     "n_eff": {
      "custody": 10.0,
@@ -46,11 +45,10 @@
     "tier_on_mc_lo": "silver"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 96.0597386578598,
-     "level": 0.95,
-     "lo": 86.75215007450706,
-     "point": 92.05082429856196
+    "ci_2dp": {
+     "hi": 96.06,
+     "lo": 86.75,
+     "point": 92.05
     },
     "n_eff": {
      "custody": 40,
@@ -91,11 +89,10 @@
     "tier": "silver"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 91.45440394898755,
-     "level": 0.95,
-     "lo": 70.31948174912468,
-     "point": 81.8491544319326
+    "ci_2dp": {
+     "hi": 91.45,
+     "lo": 70.32,
+     "point": 81.85
     },
     "n_eff": {
      "custody": 10.0,
@@ -125,11 +122,10 @@
     "tier_on_mc_lo": "silver"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 89.00587758524897,
-     "level": 0.95,
-     "lo": 78.29126396650491,
-     "point": 84.0709068496953
+    "ci_2dp": {
+     "hi": 89.01,
+     "lo": 78.29,
+     "point": 84.07
     },
     "n_eff": {
      "custody": 50,
@@ -170,11 +166,10 @@
     "tier": "gold"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 97.7242718677149,
-     "level": 0.95,
-     "lo": 73.72576300041987,
-     "point": 88.5740350302829
+    "ci_2dp": {
+     "hi": 97.72,
+     "lo": 73.73,
+     "point": 88.57
     },
     "n_eff": {
      "custody": 5.0,
@@ -204,11 +199,10 @@
     "tier_on_mc_lo": "silver"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 97.83977796245135,
-     "level": 0.95,
-     "lo": 87.27917658915729,
-     "point": 93.62362122289115
+    "ci_2dp": {
+     "hi": 97.84,
+     "lo": 87.28,
+     "point": 93.62
     },
     "n_eff": {
      "custody": 20,
@@ -249,11 +243,10 @@
     "tier": "silver"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 92.82716597177301,
-     "level": 0.95,
-     "lo": 55.374568230138344,
-     "point": 76.30275480076051
+    "ci_2dp": {
+     "hi": 92.83,
+     "lo": 55.37,
+     "point": 76.3
     },
     "n_eff": {
      "custody": 3.0,
@@ -283,11 +276,10 @@
     "tier_on_mc_lo": "bronze"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 90.46488636558477,
-     "level": 0.95,
-     "lo": 71.04080907771386,
-     "point": 81.65370741872842
+    "ci_2dp": {
+     "hi": 90.46,
+     "lo": 71.04,
+     "point": 81.65
     },
     "n_eff": {
      "custody": 18,
@@ -328,11 +320,10 @@
     "tier": "silver"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 88.34324091566867,
-     "level": 0.95,
-     "lo": 64.62634827180992,
-     "point": 77.46935272942639
+    "ci_2dp": {
+     "hi": 88.34,
+     "lo": 64.63,
+     "point": 77.47
     },
     "n_eff": {
      "custody": 10.0,
@@ -362,11 +353,10 @@
     "tier_on_mc_lo": "silver"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 84.69416070589928,
-     "level": 0.95,
-     "lo": 73.35645360520475,
-     "point": 79.41254044161687
+    "ci_2dp": {
+     "hi": 84.69,
+     "lo": 73.36,
+     "point": 79.41
     },
     "n_eff": {
      "custody": 60,
@@ -407,11 +397,10 @@
     "tier": "bronze"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 75.24967734188257,
-     "level": 0.95,
-     "lo": 47.04319498971989,
-     "point": 61.3567333261637
+    "ci_2dp": {
+     "hi": 75.25,
+     "lo": 47.04,
+     "point": 61.36
     },
     "n_eff": {
      "custody": 10.0,
@@ -441,11 +430,10 @@
     "tier_on_mc_lo": "bronze"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 69.09902846597507,
-     "level": 0.95,
-     "lo": 53.9818465337137,
-     "point": 61.81417526466439
+    "ci_2dp": {
+     "hi": 69.1,
+     "lo": 53.98,
+     "point": 61.81
     },
     "n_eff": {
      "custody": 30,
@@ -486,11 +474,10 @@
     "tier": "flagged"
    },
    "scenario_A_spec_literal": {
-    "ci": {
-     "hi": 42.62370355250977,
-     "level": 0.95,
-     "lo": 20.108637807040964,
-     "point": 30.43272398222979
+    "ci_2dp": {
+     "hi": 42.62,
+     "lo": 20.11,
+     "point": 30.43
     },
     "n_eff": {
      "custody": 10.0,
@@ -520,11 +507,10 @@
     "tier_on_mc_lo": "flagged"
    },
    "scenario_B_count_based": {
-    "ci": {
-     "hi": 36.541775160654794,
-     "level": 0.95,
-     "lo": 21.804633858471828,
-     "point": 28.802117307224417
+    "ci_2dp": {
+     "hi": 36.54,
+     "lo": 21.8,
+     "point": 28.8
     },
     "n_eff": {
      "custody": 20,
@@ -556,6 +542,7 @@
   }
  },
  "contract": "Method v21 \u00a77.2\u2013\u00a77.3; scenarios A (n_eff = \u03a3weights(=1.0) \u00d7 scale) and B (n_eff = #checks \u00d7 scale)",
+ "contract_precision": "CI bounds at 2 dp, round-half-even on the exact value; tier maps on the rounded lower bound (HoI ruling 13 Jul 2026)",
  "generator": "tools/reference/pcs_reference.py",
  "numpy": "2.0.2",
  "snapshot_ts": "2026-07-13T00:00:00Z"

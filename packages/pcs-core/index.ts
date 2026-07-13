@@ -14,6 +14,7 @@ import { WEIGHTS } from "./constants";
 import { seedFromObject, Pcg64 } from "./rng";
 import { scoreCustody, scoreIdentity, scoreMaterial, scoreRisk, type QuadrantRaw } from "./scorers";
 import { compositeCI, quadrantPosterior } from "./confidence";
+import { roundHalfEven2 } from "./round";
 import { sampleBeta } from "./gamma-beta";
 import { isScoreable, mapToTier } from "./tier";
 
@@ -70,11 +71,16 @@ export function composeScore(q: Quadrants, meta: ComposeMeta): PcsScore {
     material: quadrantPosterior(q.material, meta.scaleFactor, true),
     risk: quadrantPosterior(q.risk, meta.scaleFactor, false),
   };
+  // §7.3 as written: raw MC quantiles, point = mean(samples). The recentre-on-
+  // composite step was removed 13 Jul 2026 (HoI ratification of Scenario B):
+  // under count-based n_eff the honest quantiles carry the doc tiers unaided.
+  // Reported bounds carry the reproducibility contract: 2 dp, round-half-even
+  // (HoI ruling, same date) — the tier maps on the ROUNDED lower bound.
   const mc = compositeCI(posteriors, rng);
   const ci = {
-    point: composite,
-    lo: clamp(composite - (mc.point - mc.lo), 0, 100),
-    hi: clamp(composite + (mc.hi - mc.point), 0, 100),
+    point: roundHalfEven2(mc.point),
+    lo: roundHalfEven2(mc.lo),
+    hi: roundHalfEven2(mc.hi),
   };
 
   const scoreable = isScoreable({
@@ -131,24 +137,30 @@ export function scorePcs(inputs: ScoreInputs): PcsScore {
 }
 
 /** Test/golden harness — compose a score straight from quadrant raw values
- *  (bypassing the quadrant scorers) to check §12 composite/tier/determinism. */
+ *  (bypassing the quadrant scorers) to check §12 composite/tier/determinism.
+ *  checkCounts carries the Scenario-B n_eff trial counts (default 1 each). */
 export function scoreFromRaws(
   raws: { identity: number; custody: number; material: number; risk: number },
-  meta: ComposeMeta & { materialMissingWeight?: number; riskHighOverride?: boolean },
+  meta: ComposeMeta & {
+    materialMissingWeight?: number;
+    riskHighOverride?: boolean;
+    checkCounts?: { identity: number; custody: number; material: number; risk: number };
+  },
 ): PcsScore {
-  const mk = (raw: number, flags: string[] = [], missingWeight = 0): QuadrantRaw => ({
+  const counts = meta.checkCounts ?? { identity: 1, custody: 1, material: 1, risk: 1 };
+  const mk = (raw: number, totalWeight: number, flags: string[] = [], missingWeight = 0): QuadrantRaw => ({
     raw,
-    totalWeight: 1,
+    totalWeight,
     missingWeight,
     populated: true,
     flags,
   });
   return composeScore(
     {
-      identity: mk(raws.identity),
-      custody: mk(raws.custody),
-      material: mk(raws.material, [], meta.materialMissingWeight ?? 0),
-      risk: mk(raws.risk, meta.riskHighOverride ? ["COMPOSITE_OVERRIDE_FLAGGED"] : []),
+      identity: mk(raws.identity, counts.identity),
+      custody: mk(raws.custody, counts.custody),
+      material: mk(raws.material, counts.material, [], meta.materialMissingWeight ?? 0),
+      risk: mk(raws.risk, counts.risk, meta.riskHighOverride ? ["COMPOSITE_OVERRIDE_FLAGGED"] : []),
     },
     meta,
   );

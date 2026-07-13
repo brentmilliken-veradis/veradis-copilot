@@ -185,6 +185,9 @@ export async function enrich(
     coverage,
     documentQuality: input.custodyHint?.documentQuality ?? 0.7,
     gaps: input.custodyHint?.gaps ?? [],
+    // One trial per documented custody evidence item: the owner's declared
+    // baseline plus each graph cross-ref link (Scenario B n_eff).
+    eventCount: input.custodyHint?.eventCount ?? 1 + links.length,
   };
   for (const l of links) {
     const src = await repo.addCitation({

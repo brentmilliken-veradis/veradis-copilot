@@ -35,7 +35,7 @@ Data layer runs on `InMemoryRepository` + seeded fixtures; `supabase/migrations/
 
 ## Human checkpoints & go-live tasks
 
-1. **E5 scorer sign-off (Founder / Head of Intelligence — a read).** The scorer reproduces all seven Method v21 §12 composites and tiers exactly and is deterministic. Two items need sign-off: (a) the **CI bounds are engine-generated** — no NumPy reference output exists in-repo, so per §7.3 this implementation is the reference; the bounds are wider than §12's illustrative values but land the same band/tier; (b) the beta sampler is **Marsaglia–Tsang** (deterministic) rather than Cheng's BB/BC as §7.3 names, so NumPy bit-parity is unverified.
+1. **E5 scorer sign-off — CLOSED (13 Jul 2026).** The canonical NumPy reference now exists (`tools/reference/pcs_reference.py`); the engine matches it exactly at the contract precision (2 dp round-half-even) across all seven §12 cases, on Scenario-B (count-based) n_eff, with bit-level RNG parity locked in `np-parity.test.ts`. Ratified in `20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md` — the governing document for n_eff semantics and the reproducibility contract.
 2. **Go-live infra (CTO one-time).** Create the `veradis-copilot` Supabase project + Vercel project; paste the six API keys into env; apply `0001` via the Studio SQL editor (never operating-prod `tchfcyvclcjchoodgdnx`). Then flip the data layer to the Supabase repository.
 3. **Outward-facing (needs explicit go-ahead).** Commits are local — the GitHub remote and Vercel git-connect are not wired.
 

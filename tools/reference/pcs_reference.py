@@ -141,13 +141,19 @@ def run_case(case: Case, n_eff_by_q: dict[str, float], object_id: str, snapshot_
     }
     seed = seed_from_object(object_id, snapshot_ts)
     ci = composite_ci(posteriors, seed)
+    # Reproducibility contract (HoI ruling, 13 Jul 2026): CI bounds are reported
+    # and hashed at 2 dp, round-half-even on the exact value (f"{x:.2f}").
+    # Full-precision floats are libm/platform-tainted and stay OUT of the golden.
+    ci_2dp = {k: float(f"{ci[k]:.2f}") for k in ("point", "lo", "hi")}
     return {
         "posteriors": {q: {"alpha": posteriors[q][0], "beta": posteriors[q][1]} for q in QUADRANTS},
         "n_eff": n_eff_by_q,
         "seed": seed,
         "ci": ci,
+        "ci_2dp": ci_2dp,
         "composite_algebraic": composite_point(case.raws),
-        "tier_on_mc_lo": tier_from_lo(ci["lo"], flagged_override=case.key == "12.7"),
+        # Tier maps on the ROUNDED lower bound — the contract value.
+        "tier_on_mc_lo": tier_from_lo(ci_2dp["lo"], flagged_override=case.key == "12.7"),
     }
 
 
@@ -203,27 +209,28 @@ def main() -> None:
     if args.golden:
         golden_dir = Path(__file__).resolve().parents[2] / "tests" / "golden"
         golden_dir.mkdir(parents=True, exist_ok=True)
-        # Both defensible §7.2 readings are pinned; which one is binding is a
-        # methodology decision (Head-of-Intelligence sign-off, CLAUDE.md §8).
-        # Neither reproduces the doc's §12 CI values to the digit — see the
-        # per-case "doc" block for the printed values.
+        # Golden = the CONTRACT values only: CI bounds at 2 dp round-half-even,
+        # tier on the rounded lower bound, plus the platform-independent inputs
+        # (posteriors, n_eff, seeds). Full-precision CI floats are libm-tainted
+        # (they differ ~1 ulp across platform libms) and are deliberately kept
+        # out of the hashed file so regeneration reproduces on ANY platform.
+        contract_fields = ("ci_2dp", "tier_on_mc_lo", "posteriors", "n_eff", "seed")
         golden = {
             "generator": "tools/reference/pcs_reference.py",
             "numpy": np.__version__,
             "contract": "Method v21 §7.2–§7.3; scenarios A (n_eff = Σweights(=1.0) × scale) and B (n_eff = #checks × scale)",
-            "binding_scenario": "UNDECIDED — awaiting Head-of-Intelligence sign-off",
+            "contract_precision": "CI bounds at 2 dp, round-half-even on the exact value; tier maps on the rounded lower bound (HoI ruling 13 Jul 2026)",
+            "binding_scenario": "B — count-based n_eff, ratified by Head of Intelligence 13 Jul 2026 (see docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md)",
             "snapshot_ts": snapshot_ts,
             "cases": {
                 k: {
                     "doc": v["doc"],
                     "composite_algebraic": v["scenario_A_spec_literal"]["composite_algebraic"],
                     "scenario_A_spec_literal": {
-                        s: v["scenario_A_spec_literal"][s]
-                        for s in ("ci", "tier_on_mc_lo", "posteriors", "n_eff", "seed")
+                        s: v["scenario_A_spec_literal"][s] for s in contract_fields
                     },
                     "scenario_B_count_based": {
-                        s: v["scenario_B_count_based"][s]
-                        for s in ("ci", "tier_on_mc_lo", "posteriors", "n_eff", "seed")
+                        s: v["scenario_B_count_based"][s] for s in contract_fields
                     },
                 }
                 for k, v in report.items()

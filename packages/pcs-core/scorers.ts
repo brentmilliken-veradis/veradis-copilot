@@ -22,18 +22,20 @@ export interface QuadrantRaw {
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-/** §2 — Identity. raw = Σ(weight × credit) × 100. */
+/** §2 — Identity. raw = Σ(weight × credit) × 100. totalWeight is the COUNT of
+ *  assessed checks (Scenario B n_eff, HoI-ratified 13 Jul 2026): the profile
+ *  weights shape the raw score, evidence volume shapes the CI. */
 export function scoreIdentity(checks: IdentityCheckInput[]): QuadrantRaw {
   let score = 0;
-  let totalWeight = 0;
+  let assessed = 0;
   for (const c of checks) {
     score += c.weight * c.credit;
-    totalWeight += c.weight;
+    if (c.present) assessed++;
   }
   const raw = score * 100;
   return {
     raw,
-    totalWeight: totalWeight || 1,
+    totalWeight: assessed || 1,
     missingWeight: 0,
     populated: checks.some((c) => c.present),
     flags: raw < 50 ? ["CURATOR_REVIEW"] : [],
@@ -47,7 +49,8 @@ export function scoreCustody(input: CustodyInput): QuadrantRaw {
   const raw = clamp01(input.coverage - gapPenalty) * input.documentQuality * 100;
   return {
     raw,
-    totalWeight: 1,
+    // Scenario B n_eff: each documented custody event is one trial.
+    totalWeight: input.eventCount || 1,
     missingWeight: 0,
     populated: input.coverage > 0 || input.gaps.length > 0,
     flags: raw < 50 ? ["DISCLOSURE_REQUIRED"] : [],
@@ -58,6 +61,7 @@ export function scoreCustody(input: CustodyInput): QuadrantRaw {
 export function scoreMaterial(checks: MaterialCheckInput[]): QuadrantRaw {
   let weightedSum = 0;
   let weightUsed = 0;
+  let runCount = 0;
   let missingWeight = 0;
   let inconsistencies = 0;
   for (const c of checks) {
@@ -67,6 +71,7 @@ export function scoreMaterial(checks: MaterialCheckInput[]): QuadrantRaw {
     }
     weightedSum += c.weight * MATERIAL_CREDIT[c.consistency];
     weightUsed += c.weight;
+    runCount++;
     if (c.consistency === "inconsistent") inconsistencies++;
   }
   if (weightUsed === 0) {
@@ -76,7 +81,9 @@ export function scoreMaterial(checks: MaterialCheckInput[]): QuadrantRaw {
   const flags: string[] = [];
   if (inconsistencies) flags.push("MATERIAL_INCONSISTENCY");
   if (missingWeight > 0.5) flags.push("CURATOR_REVIEW");
-  return { raw, totalWeight: weightUsed, missingWeight, populated: true, flags };
+  // Scenario B n_eff: each forensic check that RAN is one trial; the fractional
+  // missingWeight still drives the §7.2 variance inflation.
+  return { raw, totalWeight: runCount, missingWeight, populated: true, flags };
 }
 
 /** §5 + §10.3 — Risk. Starts at 100, minus severity penalties; ALR cap ≤90. */

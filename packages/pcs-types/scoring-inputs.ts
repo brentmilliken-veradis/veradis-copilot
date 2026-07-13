@@ -28,6 +28,10 @@ export interface CustodyInput {
   gaps: CustodyGap[];
   /** 1.0 primary / 0.7 secondary / 0.4 tertiary (Method v21 §3). */
   documentQuality: number;
+  /** Number of documented custody events — n_eff trial count under the
+   *  count-based §7.2 reading (Scenario B, HoI-ratified 13 Jul 2026).
+   *  Defaults to 1 when absent. */
+  eventCount?: number;
 }
 
 /** Material consistency classes (Method v21 §4). A missing check does NOT lower

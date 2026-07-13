@@ -42,6 +42,29 @@ function quantile(sorted: number[], q: number): number {
   return sorted[lo] + (sorted[lo + 1] - sorted[lo]) * frac; // linear interpolation (§7.3)
 }
 
+/** numpy pairwise summation (umath DOUBLE_pairwise_sum, block 128) — the exact
+ *  accumulation np.mean uses; a sequential reduce rounds differently. */
+function pairwiseSum(a: number[], lo: number, n: number): number {
+  if (n < 8) {
+    let res = 0;
+    for (let i = lo; i < lo + n; i++) res += a[i];
+    return res;
+  }
+  if (n <= 128) {
+    const r = [a[lo], a[lo + 1], a[lo + 2], a[lo + 3], a[lo + 4], a[lo + 5], a[lo + 6], a[lo + 7]];
+    let i = 8;
+    for (; i < n - (n % 8); i += 8) {
+      for (let j = 0; j < 8; j++) r[j] += a[lo + i + j];
+    }
+    let res = (r[0] + r[1]) + (r[2] + r[3]) + ((r[4] + r[5]) + (r[6] + r[7]));
+    for (; i < n; i++) res += a[lo + i];
+    return res;
+  }
+  let n2 = Math.floor(n / 2);
+  n2 -= n2 % 8;
+  return pairwiseSum(a, lo, n2) + pairwiseSum(a, lo + n2, n - n2);
+}
+
 /** §7.3 — composite credible interval. Returns the MC mean + 95% bounds. */
 export function compositeCI(
   posteriors: { identity: PosteriorParams; custody: PosteriorParams; material: PosteriorParams; risk: PosteriorParams },
@@ -57,7 +80,8 @@ export function compositeCI(
       WEIGHTS.risk * sampleBeta(rng, posteriors.risk.alpha, posteriors.risk.beta);
     samples[i] = s * 100;
   }
+  // Mean over the ORIGINAL draw order (np.mean semantics), then sort for quantiles.
+  const mean = pairwiseSum(samples, 0, draws) / draws;
   samples.sort((a, b) => a - b);
-  const mean = samples.reduce((a, x) => a + x, 0) / draws;
   return { point: mean, lo: quantile(samples, 0.025), hi: quantile(samples, 0.975) };
 }

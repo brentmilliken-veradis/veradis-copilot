@@ -1,46 +1,68 @@
-// Golden regression — Method v21 Algorithm §12.1–§12.7.
-// Asserts the deterministic parts to the digit: the algebraic composite (exact),
-// the tier (on the lower CI bound), and bit-identical reruns. The CI bounds are
-// engine-generated (this implementation is the reference per §7.3) and pinned as
-// a regression; their absolute values await the Head-of-Intelligence sign-off
-// after E5 (they are NOT claimed bit-parity with a NumPy reference).
+// Golden regression — Method v21 Algorithm §12.1–§12.7, SHA-256-locked to the
+// canonical NumPy reference (tools/reference/pcs_reference.py) per §7.3/§13.
+// Binding: Scenario B (count-based n_eff), HoI-ratified 13 Jul 2026 — see
+// docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md.
+// Reproducibility contract: CI bounds at 2 dp round-half-even (HoI ruling,
+// same date) — the golden carries only contract values, so it regenerates
+// identically on any platform; sub-2dp libm drift is explicitly out of scope.
+// Comparisons remain exact (===) AT the contract precision.
 
-import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 import { scoreFromRaws } from "./index";
-import type { Tier } from "@/packages/pcs-types";
 
-interface GoldenCase {
+const GOLDEN_URL = new URL("../../tests/golden/pcs-golden-v21.json", import.meta.url);
+const GOLDEN_RAW = readFileSync(GOLDEN_URL, "utf8");
+const GOLDEN = JSON.parse(GOLDEN_RAW);
+const PINNED_SHA = readFileSync(new URL("../../tests/golden/pcs-golden-v21.sha256", import.meta.url), "utf8").trim();
+
+// §12 inputs (raws + Scenario-B check counts), mirrored from the reference.
+const CASES: Record<string, {
   name: string;
   raws: { identity: number; custody: number; material: number; risk: number };
   scaleFactor: number;
   materialMissingWeight?: number;
-  composite: number;
-  tier: Tier;
-}
+  checkCounts: { identity: number; custody: number; material: number; risk: number };
+}> = {
+  "12.1": { name: "AP Royal Oak 5516", raws: { identity: 96, custody: 91, material: 95, risk: 90 }, scaleFactor: 10, materialMissingWeight: 0.1, checkCounts: { identity: 7, custody: 4, material: 4, risk: 1 } },
+  "12.2": { name: "Omega Speedmaster 145.022", raws: { identity: 98, custody: 64, material: 92, risk: 90 }, scaleFactor: 10, checkCounts: { identity: 7, custody: 5, material: 5, risk: 1 } },
+  "12.3": { name: "Lee-Enfield No.4 Mk 1", raws: { identity: 97, custody: 96, material: 94, risk: 100 }, scaleFactor: 5, checkCounts: { identity: 6, custody: 4, material: 5, risk: 1 } },
+  "12.4": { name: "Porsche 911 Carrera RS", raws: { identity: 95, custody: 78, material: 73, risk: 100 }, scaleFactor: 3, checkCounts: { identity: 6, custody: 6, material: 4, risk: 1 } },
+  "12.5": { name: "Rolex Submariner 5513", raws: { identity: 94, custody: 58, material: 85, risk: 90 }, scaleFactor: 10, checkCounts: { identity: 7, custody: 6, material: 5, risk: 1 } },
+  "12.6": { name: "Tudor Submariner 7928", raws: { identity: 58, custody: 51, material: 65, risk: 90 }, scaleFactor: 10, checkCounts: { identity: 7, custody: 3, material: 5, risk: 1 } },
+  "12.7": { name: "fake Daytona 6263", raws: { identity: 28, custody: 22, material: 0, risk: 90 }, scaleFactor: 10, checkCounts: { identity: 4, custody: 2, material: 5, risk: 1 } },
+};
 
-// §12.1–§12.7. Composites are the exact arithmetic weighted sums.
-const CASES: GoldenCase[] = [
-  { name: "§12.1 AP Royal Oak 5516", raws: { identity: 96, custody: 91, material: 95, risk: 90 }, scaleFactor: 10, materialMissingWeight: 0.1, composite: 93.35, tier: "gold" },
-  { name: "§12.2 Omega Speedmaster", raws: { identity: 98, custody: 64, material: 92, risk: 90 }, scaleFactor: 10, composite: 85.1, tier: "silver" },
-  { name: "§12.3 Lee-Enfield No.4 (Seaforth)", raws: { identity: 97, custody: 96, material: 94, risk: 100 }, scaleFactor: 5, composite: 96.4, tier: "gold" },
-  { name: "§12.4 Porsche 911 Carrera RS", raws: { identity: 95, custody: 78, material: 73, risk: 100 }, scaleFactor: 3, composite: 85.15, tier: "silver" },
-  { name: "§12.5 Rolex 5513 (period bracelet)", raws: { identity: 94, custody: 58, material: 85, risk: 90 }, scaleFactor: 10, composite: 80.35, tier: "silver" },
-  { name: "§12.6 Tudor 7928 (Bronze)", raws: { identity: 58, custody: 51, material: 65, risk: 90 }, scaleFactor: 10, composite: 62.45, tier: "bronze" },
-  { name: "§12.7 fake Daytona (Flagged)", raws: { identity: 28, custody: 22, material: 0, risk: 90 }, scaleFactor: 10, composite: 28.5, tier: "flagged" },
-];
+describe("PCS Algorithm v21 §12 — golden regression (Scenario B, NumPy-locked)", () => {
+  it("golden file integrity — SHA-256 matches the pinned hash", () => {
+    expect(createHash("sha256").update(GOLDEN_RAW, "utf8").digest("hex")).toBe(PINNED_SHA);
+  });
 
-describe("PCS Algorithm v21 §12 — golden regression", () => {
-  for (const c of CASES) {
-    it(`${c.name}: composite ${c.composite}, tier ${c.tier}`, () => {
-      const meta = { objectId: c.name, snapshotTs: "2026-07-13T00:00:00Z", scaleFactor: c.scaleFactor, withheldDisclosure: false, materialMissingWeight: c.materialMissingWeight };
-      const s = scoreFromRaws(c.raws, meta);
-      // Composite: exact algebraic weighted sum.
-      expect(s.composite).toBeCloseTo(c.composite, 2);
-      // Tier: on the lower CI bound, matches the doc.
-      expect(s.tier).toBe(c.tier);
-      // The point sits inside its interval.
-      expect(s.ci.lo).toBeLessThanOrEqual(s.ci.point);
-      expect(s.ci.point).toBeLessThanOrEqual(s.ci.hi);
+  it("golden binding is Scenario B", () => {
+    expect(GOLDEN.binding_scenario).toMatch(/^B /);
+  });
+
+  for (const [key, c] of Object.entries(CASES)) {
+    const g = GOLDEN.cases[key];
+    it(`§${key} ${c.name}: composite, CI (exact), tier match the NumPy reference`, () => {
+      const s = scoreFromRaws(c.raws, {
+        objectId: `§${key} ${c.name}`,
+        snapshotTs: GOLDEN.snapshot_ts,
+        scaleFactor: c.scaleFactor,
+        withheldDisclosure: false,
+        materialMissingWeight: c.materialMissingWeight,
+        checkCounts: c.checkCounts,
+      });
+      const ref = g.scenario_B_count_based;
+      expect(s.composite).toBe(g.composite_algebraic);
+      // Exact at the contract precision (2 dp round-half-even) — no tolerance.
+      expect(s.ci.point).toBe(ref.ci_2dp.point);
+      expect(s.ci.lo).toBe(ref.ci_2dp.lo);
+      expect(s.ci.hi).toBe(ref.ci_2dp.hi);
+      expect(s.tier).toBe(ref.tier_on_mc_lo);
+      // Doc tier (post-errata §12) must agree.
+      expect(s.tier).toBe(g.doc.tier);
     });
   }
 

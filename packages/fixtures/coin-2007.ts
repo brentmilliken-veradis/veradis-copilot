@@ -103,6 +103,9 @@ function buildPlain(version: 1 | 2, opts: { provisional?: boolean } = {}): Repor
     scaleFactor: SCALE,
     withheldDisclosure: false,
     materialMissingWeight: 0,
+    // Scenario-B n_eff trial counts = the checks() rows per quadrant
+    // (5 identity / 1 custody / 2 material / 1 risk, both versions).
+    checkCounts: { identity: 5, custody: 1, material: 2, risk: 1 },
   });
 
   const attrs = { country: "Canada", denomination: "Proof Set", year: "2007", mint_mark: "RCM", variety: "Proof" };
