@@ -25,12 +25,15 @@ import type { VisionRedFlag } from "@/packages/adapters/vision";
 
 const CORPUS_MATCH_THRESHOLD = 0.35;
 
+// CI scale factor (§7.2) — higher = data dominates the prior (tighter CI).
+// Coins carry the richest machine-readable data (PCGS + Numista APIs, die-match),
+// so they earn horology-grade confidence.
 const SCALE_BY_CATEGORY: Record<string, number> = {
   watches: 10,
-  coins: 5,
+  coins: 10,
+  cards: 10,
   medals: 5,
   silver: 5,
-  cards: 5,
 };
 
 export interface EnrichAdapters {

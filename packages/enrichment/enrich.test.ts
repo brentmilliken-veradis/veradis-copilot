@@ -125,7 +125,7 @@ describe("enrich (E4)", () => {
     const repo = new InMemoryRepository();
     const report = await makeReport(repo);
     const res = await enrich(repo, adapters(), input(report, RESOLVED));
-    expect(res.scoreInputs.scaleFactor).toBe(5);
+    expect(res.scoreInputs.scaleFactor).toBe(10);
     expect(res.scoreInputs.alrEnabled).toBe(false);
   });
 });

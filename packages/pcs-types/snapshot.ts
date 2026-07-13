@@ -126,6 +126,11 @@ export interface ReportSnapshot {
   citations: SnapshotCitation[];
   corrections: SnapshotCorrection[];
   score: PcsScore;
+  /** SHA-256 of this version's content (report_version.snapshot_sha256). Set when
+   *  the version is persisted; the renderer displays it in the attestation. */
+  snapshotSha256?: string;
+  /** The prior version's content hash — the hash-chain link (gate ⑥). */
+  supersedesSha256?: string;
   /** Appraise only. */
   valuation?: Valuation;
   narrative: NarrativeSection[];
