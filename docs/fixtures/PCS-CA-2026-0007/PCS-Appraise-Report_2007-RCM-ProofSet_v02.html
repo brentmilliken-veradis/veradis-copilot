@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>PCS + Appraise · 2007 RCM Proof Set · v02 · veradis.ai</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600&family=Instrument+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--parchment:#FAF6EC;--obsidian:#1A1714;--graphite:#33302B;--stone:#6B6956;--ash:#BFB9AD;--brass:#A87D2E;--brass-deep:#8A6420;--brass-light:#D4A565;--forest:#1A4533;--bone:#E8E2D2;--veil:#F2EDDC;--mint:#D4F2C3;--serif:'DM Serif Display',Georgia,serif;--sans:'Inter',sans-serif;--label:'Instrument Sans',sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--parchment);color:var(--graphite);font-family:var(--sans);line-height:1.6;}
+  .page{max-width:900px;margin:0 auto;padding:48px 32px 90px;}
+  h1,h2{font-family:var(--serif);font-weight:400;color:var(--obsidian);line-height:1.15;}
+  h1{font-size:34px;} h2{font-size:23px;margin-bottom:14px;}
+  .kicker{font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--brass-deep);display:block;margin-bottom:10px;}
+  section{margin-top:44px;} p{font-size:14.5px;} em{font-family:var(--serif);font-style:italic;color:var(--forest);}
+  .demo-banner{background:var(--obsidian);color:var(--parchment);border-radius:10px;padding:14px 20px;font-size:12.5px;margin-bottom:30px;display:flex;gap:14px;align-items:baseline;}
+  .demo-banner .tag{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.18em;text-transform:uppercase;background:var(--mint);color:var(--forest);border-radius:999px;padding:3px 10px;flex:none;}
+  .brandline{display:flex;align-items:center;gap:10px;font-family:var(--label);font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-deep);margin-bottom:16px;}
+  .prism{width:18px;height:18px;}
+  .subline{color:var(--stone);font-size:14px;margin-top:6px;}
+  .meta-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px;background:var(--veil);border:1px solid var(--bone);border-radius:10px;padding:16px 20px;}
+  .meta-strip div b{display:block;font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--stone);margin-bottom:3px;}
+  .meta-strip div{font-size:12.5px;color:var(--obsidian);}
+  /* delta panel */
+  .delta{margin-top:22px;border:1px solid var(--bone);border-radius:10px;overflow:hidden;}
+  .delta .dh{background:var(--obsidian);color:var(--parchment);font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:10px 18px;}
+  .delta table{width:100%;border-collapse:collapse;font-size:13px;}
+  .delta td,.delta th{padding:9px 18px;border-bottom:1px solid var(--bone);text-align:left;}
+  .delta th{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);}
+  .delta .up{color:var(--forest);font-weight:600;}
+  .delta tr:last-child td{border-bottom:0;}
+  .scope{background:#fff;border:1px solid var(--bone);border-left:3px solid var(--brass);border-radius:10px;padding:16px 20px;font-size:13px;margin-top:22px;}
+  .scope b{color:var(--obsidian);}
+  .fixed-line{color:var(--stone);font-style:italic;font-size:12.5px;margin-top:8px;}
+  .prov{background:#F3F8F4;border:1px solid #B8E0A4;border-radius:10px;padding:16px 20px;margin-top:22px;font-size:13.5px;}
+  .prov b{color:var(--forest);}
+  .verdict{margin-top:26px;background:linear-gradient(160deg,#FFFFFF,#FBF8EF);border:1px solid var(--bone);border-radius:14px;padding:30px;display:grid;grid-template-columns:230px 1fr;gap:38px;align-items:start;box-shadow:0 14px 40px rgba(26,23,20,.06);}
+  .ring{width:180px;height:180px;border-radius:50%;background:conic-gradient(var(--forest) 0 93%, var(--bone) 93% 100%);display:flex;align-items:center;justify-content:center;margin:0 auto;}
+  .ring .inner{width:146px;height:146px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--bone);}
+  .pcs-num{font-family:var(--serif);font-size:56px;color:var(--forest);line-height:1;font-variant-numeric:tabular-nums;}
+  .pcs-ci{font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);margin-top:4px;}
+  .tier{display:block;text-align:center;font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.2em;text-transform:uppercase;border-radius:999px;padding:5px 14px;margin:14px auto 0;background:#F4EDDD;border:1px solid #E4D5B4;color:var(--brass-deep);width:max-content;}
+  .proj{display:block;text-align:center;font-size:11px;color:var(--forest);margin-top:8px;font-family:var(--label);font-weight:600;letter-spacing:.08em;text-transform:uppercase;}
+  .comp{margin-bottom:15px;}
+  .comp-head{display:flex;justify-content:space-between;align-items:baseline;}
+  .comp-head b{color:var(--obsidian);font-weight:600;font-size:14px;}
+  .comp-head .score{font-variant-numeric:tabular-nums;font-weight:600;font-size:16px;color:var(--forest);}
+  .comp-head .ghost{font-family:var(--label);font-size:9px;letter-spacing:.06em;color:var(--stone);font-weight:600;margin-left:8px;}
+  .bar{height:7px;background:var(--bone);border-radius:999px;margin-top:6px;overflow:hidden;position:relative;}
+  .bar span{display:block;height:100%;border-radius:999px;}
+  .bar .gmark{position:absolute;top:-2px;height:11px;width:2px;background:var(--ash);}
+  .comp-note{font-size:11.5px;color:var(--stone);margin-top:5px;}
+  .arith{font-family:var(--label);font-size:10.5px;letter-spacing:.04em;color:var(--stone);margin-top:14px;padding-top:12px;border-top:1px solid var(--bone);}
+  table.d{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;}
+  .d th,.d td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--bone);vertical-align:top;}
+  .d th{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);}
+  .ok{color:var(--forest);font-weight:600;} .gap{color:var(--brass-deep);font-weight:600;} .base{color:var(--stone);}
+  .pill{display:inline-block;font-family:var(--label);font-weight:600;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:2px 8px;}
+  .pill.res{background:#EAF3EC;color:var(--forest);border:1px solid #B8E0A4;} .pill.seal{background:#F4EDDD;color:var(--brass-deep);border:1px solid #E4D5B4;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+  .thumb{border:1px solid var(--bone);border-radius:8px;overflow:hidden;background:#fff;}
+  .thumb img{display:block;width:100%;height:150px;object-fit:cover;} .thumb .cap{font-size:10.5px;color:var(--stone);padding:6px 8px;}
+  .coverage{font-family:var(--label);font-weight:600;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--stone);margin-top:12px;}
+  .value-band{background:var(--obsidian);color:var(--parchment);border-radius:12px;padding:24px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-top:8px;}
+  .value-band .num{font-family:var(--serif);font-size:32px;color:var(--parchment);} .value-band .num small{font-size:15px;color:var(--ash);}
+  .value-band .vt{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass-light);}
+  .value-band .grade{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.16em;text-transform:uppercase;background:var(--brass);color:var(--obsidian);border-radius:999px;padding:4px 12px;}
+  .action{display:flex;gap:12px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--bone);}
+  .action .n{font-family:var(--serif);font-size:20px;color:var(--brass);flex:none;width:24px;} .action b{color:var(--obsidian);}
+  .action .fx{font-family:var(--label);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);}
+  .attest{background:var(--obsidian);color:var(--ash);border-radius:12px;padding:24px 28px;margin-top:20px;font-size:12px;line-height:1.6;}
+  .attest h2{color:var(--parchment);font-size:18px;} .attest .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin:14px 0;}
+  .attest b{font-family:var(--label);font-weight:600;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);display:block;} .attest code{font-family:ui-monospace,monospace;font-size:10px;color:var(--mint);word-break:break-all;}
+  .attest .liability{color:var(--ash);font-size:11px;border-top:1px solid #35302a;padding-top:14px;margin-top:14px;}
+  .guide{background:var(--veil);border:1px solid var(--bone);border-radius:10px;padding:18px 22px;margin-top:20px;font-size:11.5px;color:var(--stone);line-height:1.7;} .guide b{color:var(--graphite);}
+  footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--bone);font-size:11.5px;color:var(--stone);} footer a{color:var(--brass-deep);}
+  @media(max-width:720px){.verdict{grid-template-columns:1fr;}.meta-strip{grid-template-columns:1fr 1fr;}.grid{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="demo-banner">
+    <span class="tag">Live co-pilot · v02</span>
+    <span>Re-scored after the owner added provenance (single owner from new · 2007 gift · original receipt) and confirmed the set is <b>factory-sealed</b>. Provisional, pending curator confirmation.</span>
+  </div>
+
+  <div class="brandline">
+    <svg class="prism" viewBox="0 0 24 24" fill="none"><path d="M12 2 22 8v8L12 22 2 16V8L12 2Z" stroke="#8A6420" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 2v20M2 8l10 6 10-6" stroke="#1A4533" stroke-width="1.3" stroke-linejoin="round"/></svg>
+    veradis · Verify + Appraise dossier
+  </div>
+
+  <span class="kicker">Provenance Confidence Score + indicative value</span>
+  <h1>2007 Royal Canadian Mint Proof Set<br>— <em>Celebrating Thayendanegea</em> (Joseph Brant)</h1>
+  <p class="subline">The "Double Dollar" annual proof set · RCM #6260007 · eight coins, factory-sealed, book-case + certificate.</p>
+
+  <div class="meta-strip">
+    <div><b>Report</b>PCS-CA-2026-0007 · v02</div>
+    <div><b>Effective date</b>12 July 2026</div>
+    <div><b>Method / snapshot</b>PCS v21 · snap 2026-07-12</div>
+    <div><b>Basis</b>Documentary + visual + owner provenance</div>
+  </div>
+
+  <!-- DELTA PANEL -->
+  <section>
+    <span class="kicker">What changed since v01</span>
+    <div class="delta">
+      <div class="dh">Evidence ladder · v01 → v02</div>
+      <table>
+        <thead><tr><th>Measure</th><th>v01</th><th>v02</th><th>What moved it</th></tr></thead>
+        <tbody>
+          <tr><td>PCS score</td><td>85</td><td class="up">93</td><td>Provenance narrative + receipt; sealed-state confirmed</td></tr>
+          <tr><td>Interval (±)</td><td>± 6</td><td class="up">± 4</td><td>Custody resolved; material confirmed by intact seal</td></tr>
+          <tr><td>Tier (lower bound)</td><td>Silver (79)</td><td class="up">Gold (89)</td><td>Lower bound crossed 80</td></tr>
+          <tr><td>Custody &amp; story</td><td>86</td><td class="up">96</td><td>Single owner from new + original receipt</td></tr>
+          <tr><td>Material integrity</td><td>70</td><td class="up">88</td><td>Factory seal + COA + mint spec = composition evidence</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SCOPE -->
+  <section>
+    <span class="kicker">Scope &amp; intended use</span>
+    <div class="scope">
+      <p>Prepared for the owner, for personal record, sale, or an insurance conversation. Value type below is <b>indicative fair market value</b> — <b>not a certified appraisal, and not a certificate of authenticity.</b></p>
+      <p class="fixed-line">veradis' fee is fixed and does not depend on the value concluded.</p>
+      <p class="fixed-line">Values and registry results are as of the effective date; insurers typically require re-verification after 12–36 months.</p>
+    </div>
+  </section>
+
+  <!-- PROVENANCE -->
+  <section>
+    <span class="kicker">Provenance, as told and held</span>
+    <div class="prov">
+      <p><b>Single owner from new.</b> Purchased new as a 2007 Christmas gift (a family tradition), held by one owner since. Presented <b>factory-sealed in the original Royal Canadian Mint lens</b>, in the maroon book-case with the numbered certificate. With the <b>original purchase receipt attested</b>, the chain of custody is complete from the mint to today — as clean as a modern object's provenance gets.</p>
+    </div>
+  </section>
+
+  <!-- VERDICT -->
+  <section>
+    <span class="kicker">The verdict</span>
+    <h2>Provenance Confidence Score</h2>
+    <div class="verdict">
+      <div>
+        <div class="ring"><div class="inner"><span class="pcs-num">93</span><span class="pcs-ci">± 4 · 95% CI</span></div></div>
+        <span class="tier">Gold · lower bound 89</span>
+        <span class="proj">Sealed · original · single-owner</span>
+      </div>
+      <div>
+        <div class="comp">
+          <div class="comp-head"><b>Identity</b><span class="score">95 <span class="ghost">(v01 95)</span></span></div>
+          <div class="bar"><span style="width:95%;background:var(--forest);"></span></div>
+          <div class="comp-note">Product, year and mintage resolved against the RCM record + the in-hand certificate (35,606 / 60,000). <span class="pill res">Authority-resolved</span></div>
+        </div>
+        <div class="comp">
+          <div class="comp-head"><b>Custody &amp; story</b><span class="score">96 <span class="ghost">(v01 86)</span></span></div>
+          <div class="bar"><span style="width:96%;background:var(--forest);"></span><span class="gmark" style="left:86%"></span></div>
+          <div class="comp-note">Single owner from new (2007 gift) with original receipt attested; factory-sealed, complete, numbered COA. Unbroken mint-to-owner chain. <span class="pill res">Authority-resolved</span></div>
+        </div>
+        <div class="comp">
+          <div class="comp-head"><b>Material integrity</b><span class="score">88 <span class="ghost">(v01 70)</span></span></div>
+          <div class="bar"><span style="width:88%;background:var(--forest);"></span><span class="gmark" style="left:70%"></span></div>
+          <div class="comp-note"><b>Confirmed by the intact factory seal + COA + the RCM specification.</b> The mint sealed these coins as-struck; an independent assay would require <b>breaking the seal — which is contraindicated, as it reduces value.</b> The seal is the material evidence. <span class="pill seal">Sealed · mint-documented</span></div>
+        </div>
+        <div class="comp">
+          <div class="comp-head"><b>Risk profile</b><span class="score">90 <span class="ghost">(v01 90)</span></span></div>
+          <div class="bar"><span style="width:90%;background:var(--forest);"></span></div>
+          <div class="comp-note">Mass modern issue; no theft, sanctions or dispute flag applies. Capped at 90 while stolen-property registry coverage is partial.</div>
+        </div>
+        <div class="arith">(95 × .30) + (96 × .30) + (88 × .25) + (90 × .15) = 92.8, reported as <b>93</b> · tier on the lower bound (89) · ghost-markers show the v01 values.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MATERIAL -->
+  <section>
+    <span class="kicker">Material characterisation</span>
+    <h2>Declared · documented · sealed state</h2>
+    <table class="d">
+      <thead><tr><th>Coin</th><th>Composition (RCM spec)</th><th>Silver?</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>1¢</td><td>Copper (2.5 g)</td><td class="base">Base metal</td><td><span class="pill seal">Sealed</span></td></tr>
+        <tr><td>5¢ / 10¢ / 25¢ / 50¢</td><td>.925 sterling silver</td><td class="ok">Silver</td><td><span class="pill seal">Sealed · mint-documented</span></td></tr>
+        <tr><td>$1 loonie</td><td>Nickel electroplated bronze (7 g)</td><td class="base">Base metal</td><td><span class="pill seal">Sealed</span></td></tr>
+        <tr><td>$2 toonie</td><td>.925 sterling silver, single alloy (8.83 g)</td><td class="ok">Silver</td><td><span class="pill seal">Sealed · mint-documented</span></td></tr>
+        <tr><td>$1 Thayendanegea</td><td>.925 sterling silver (25.18 g) + selective gold plate</td><td class="ok">Silver</td><td><span class="pill seal">Sealed · gold plate visible</span></td></tr>
+      </tbody>
+    </table>
+    <p class="comp-note">≈ 1.69 troy oz ASW. <b>We recommend the set stays sealed.</b> A sealed original with COA is worth more than a broken one; the seal, the certificate and the mint's own specification together confirm composition without a destructive assay. If ever unsealed, a 0.01 g weight per coin (or XRF) is the confirmation.</p>
+  </section>
+
+  <!-- EVIDENCE -->
+  <section>
+    <span class="kicker">Evidence on file</span>
+    <h2>Nine photographs, hashed at intake</h2>
+    <div class="grid">
+      <div class="thumb"><img src="IMG_2349.jpg" alt="reverse tray"><div class="cap">Reverse tray · all 8 coins · gold-plated dollar</div></div>
+      <div class="thumb"><img src="IMG_2350.jpg" alt="obverse tray"><div class="cap">Obverse tray · effigy · mint marks</div></div>
+      <div class="thumb"><img src="IMG_2353.jpg" alt="case + cert"><div class="cap">Sealed lens, case &amp; certificate</div></div>
+      <div class="thumb"><img src="IMG_2356.jpg" alt="cert EN"><div class="cap">Certificate · Thayendanegea (EN)</div></div>
+      <div class="thumb"><img src="IMG_2355.jpg" alt="mintage"><div class="cap">Certificate · mintage 35,606 / 60,000</div></div>
+      <div class="thumb"><img src="IMG_2348.jpg" alt="cover"><div class="cap">Maroon cover · RCM logo mark</div></div>
+    </div>
+    <p class="coverage">Coverage 6 / 8 core views (sealed set — the material views are documented by the mint, not required) · next capture: the original purchase receipt (attaches the custody chain in writing).</p>
+  </section>
+
+  <!-- APPRAISE -->
+  <section>
+    <span class="kicker">Appraise · what it's worth</span>
+    <h2>Indicative fair market value</h2>
+    <div class="value-band">
+      <div>
+        <div class="vt">Fair market value · sealed complete set, box + certificate</div>
+        <div class="num">CAD $240 – $310 <small>(CHF ≈ 144 – 186)</small></div>
+      </div>
+      <div style="text-align:right;">
+        <div class="grade">Grade · Informed</div>
+        <div style="font-size:11.5px;color:var(--ash);margin-top:8px;">Sealed / single-owner premium<br>over the CAD $210–285 open-set band</div>
+      </div>
+    </div>
+    <p class="comp-note" style="margin-top:14px;">Owner currency leads; CHF at 0.6. A <b>factory-sealed, single-owner-from-new</b> set with the receipt sits at the top of the range — collectors and insurers pay for the unbroken provenance and the intact seal. Still bullion-plus, not a rarity; the silver spot sets the floor (≈ CAD $135–140).</p>
+  </section>
+
+  <!-- ACTIONS -->
+  <section>
+    <span class="kicker">What holds the Gold and preserves the value</span>
+    <h2>Two actions — and one thing not to do</h2>
+    <div class="action"><span class="n">1</span><div><b>Upload the original 2007 purchase receipt.</b> Attests the custody chain in writing and locks Custody at its ceiling. <span class="fx">Closes the last provenance check</span></div></div>
+    <div class="action"><span class="n">2</span><div><b>A raking-light photo through the sealed lens</b> of the gold-plated dollar and one silver coin. Non-destructive; confirms surface condition. <span class="fx">Firms condition · protects the value band</span></div></div>
+    <div class="action"><span class="n">✕</span><div><b>Do not break the seal to weigh the coins.</b> The intact factory seal + COA + mint specification already evidence composition; breaking it would reduce value, not raise the score. <span class="fx">Keep it sealed</span></div></div>
+  </section>
+
+  <!-- ATTESTATION -->
+  <section>
+    <span class="kicker">Attestation</span>
+    <div class="attest">
+      <h2>What this signature attests</h2>
+      <div class="grid2">
+        <div><b>Report</b>PCS-CA-2026-0007 · v02 (supersedes v01)</div>
+        <div><b>Method / snapshot</b>PCS v21 · 2026-07-12</div>
+        <div><b>Snapshot hash</b><code>sha256: (assigned on issue) · chains v01</code></div>
+        <div><b>Curator</b><code>pending confirmation</code></div>
+      </div>
+      <p>Reproducibility — re-running this method against this data snapshot reproduces this score to the digit (pinned-seed deterministic pipeline).</p>
+      <p>Falsifiability — this method returns Flagged, with the evidence, when an identity fails its checks; appeals resolve within fourteen days.</p>
+      <p class="liability">This Provenance Confidence Score is a probabilistic verification report based on digital data analysis cross-referenced against named sources. It is intelligence, not insurance. It does not constitute a legal certificate of authentication, a guarantee against loss, or an indemnity against fraud. For high-value transactions, buyers should conduct physical inspection by a qualified specialist. veradis.ai is not liable for financial loss resulting from reliance on this report.</p>
+    </div>
+  </section>
+
+  <section>
+    <span class="kicker">Reading guide</span>
+    <div class="guide"><p><b>The score (0–100)</b> weights Identity 30 · Custody 30 · Material 25 · Risk 15; the <b>tier is set on the lower bound</b> of the 95% interval, so it is deliberately conservative. <b>New evidence narrows the ± and can lift the tier</b> — here, the provenance story, the receipt, and confirming the set is factory-sealed moved the report from Silver 85 ± 6 to <b>Gold 93 ± 4</b>. For sealed original product, the intact seal and the mint's own specification are treated as the material evidence — the method does not penalise you for not breaking a seal it would be wrong to break.</p></div>
+  </section>
+
+  <footer>
+    <p><b>Sources named:</b> Royal Canadian Mint #6260007 specification + the in-hand Certificate of Authenticity (primary) · owner provenance (single owner from new, 2007 receipt attested) · Numista · APMEX (composition / ASW) · eBay realized sale · Century Stamps (dealer) · silver spot ~US$59/oz (Jul 2026).</p>
+    <p style="margin-top:8px;">veradis Verify + Appraise · method PCS v21 · v02 supersedes v01 (hash-chained) · Veradis Intelligence INC. (BC1492323, Canada). Indicative — not a certified appraisal, not a certificate of authenticity. <em>Know it's real. Know its story.</em></p>
+  </footer>
+
+</div>
+</body>
+</html>

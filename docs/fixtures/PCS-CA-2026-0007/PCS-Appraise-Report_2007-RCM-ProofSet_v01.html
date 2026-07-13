@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>PCS + Appraise · 2007 RCM Proof Set (Thayendanegea) · veradis.ai</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600&family=Instrument+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --parchment:#FAF6EC; --obsidian:#1A1714; --graphite:#33302B; --stone:#6B6956; --ash:#BFB9AD;
+    --brass:#A87D2E; --brass-deep:#8A6420; --forest:#1A4533; --bone:#E8E2D2; --veil:#F2EDDC; --mint:#D4F2C3;
+    --serif:'DM Serif Display',Georgia,serif; --sans:'Inter',sans-serif; --label:'Instrument Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--parchment);color:var(--graphite);font-family:var(--sans);line-height:1.6;}
+  .page{max-width:900px;margin:0 auto;padding:48px 32px 90px;}
+  h1,h2{font-family:var(--serif);font-weight:400;color:var(--obsidian);line-height:1.15;}
+  h1{font-size:34px;} h2{font-size:23px;margin-bottom:14px;}
+  .kicker{font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--brass-deep);display:block;margin-bottom:10px;}
+  section{margin-top:46px;}
+  p{font-size:14.5px;} em{font-family:var(--serif);font-style:italic;color:var(--forest);}
+  a{color:var(--forest);}
+  .demo-banner{background:var(--obsidian);color:var(--parchment);border-radius:10px;padding:14px 20px;font-size:12.5px;margin-bottom:30px;display:flex;gap:14px;align-items:baseline;}
+  .demo-banner .tag{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.18em;text-transform:uppercase;background:var(--mint);color:var(--forest);border-radius:999px;padding:3px 10px;flex:none;}
+  .brandline{display:flex;align-items:center;gap:10px;font-family:var(--label);font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-deep);margin-bottom:16px;}
+  .prism{width:18px;height:18px;}
+  .subline{color:var(--stone);font-size:14px;margin-top:6px;}
+  .meta-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px;background:var(--veil);border:1px solid var(--bone);border-radius:10px;padding:16px 20px;}
+  .meta-strip div b{display:block;font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--stone);margin-bottom:3px;}
+  .meta-strip div{font-size:12.5px;color:var(--obsidian);}
+  .scope{background:#fff;border:1px solid var(--bone);border-left:3px solid var(--brass);border-radius:10px;padding:16px 20px;font-size:13px;margin-top:22px;}
+  .scope b{color:var(--obsidian);}
+  .fixed-line{color:var(--stone);font-style:italic;font-size:12.5px;margin-top:8px;}
+  .correction{background:#F3F8F4;border:1px solid #B8E0A4;border-radius:10px;padding:16px 20px;margin-top:22px;font-size:13.5px;}
+  .correction b{color:var(--forest);}
+  /* verdict */
+  .verdict{margin-top:26px;background:linear-gradient(160deg,#FFFFFF,#FBF8EF);border:1px solid var(--bone);border-radius:14px;padding:30px;display:grid;grid-template-columns:230px 1fr;gap:38px;align-items:start;box-shadow:0 14px 40px rgba(26,23,20,.06);}
+  .ring{width:180px;height:180px;border-radius:50%;background:conic-gradient(var(--forest) 0 85%, var(--bone) 85% 100%);display:flex;align-items:center;justify-content:center;margin:0 auto;}
+  .ring .inner{width:146px;height:146px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--bone);}
+  .pcs-num{font-family:var(--serif);font-size:56px;color:var(--forest);line-height:1;font-variant-numeric:tabular-nums;}
+  .pcs-ci{font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);margin-top:4px;}
+  .tier{display:block;text-align:center;font-family:var(--label);font-weight:600;font-size:10px;letter-spacing:.2em;text-transform:uppercase;border-radius:999px;padding:5px 14px;margin:14px auto 0;background:#EFECE4;border:1px solid var(--ash);color:var(--graphite);width:max-content;}
+  .proj{display:block;text-align:center;font-size:11px;color:var(--brass-deep);margin-top:8px;font-family:var(--label);font-weight:600;letter-spacing:.08em;text-transform:uppercase;}
+  .comp{margin-bottom:15px;}
+  .comp-head{display:flex;justify-content:space-between;align-items:baseline;}
+  .comp-head b{color:var(--obsidian);font-weight:600;font-size:14px;}
+  .comp-head .score{font-variant-numeric:tabular-nums;font-weight:600;font-size:16px;color:var(--forest);}
+  .comp-head .score.low{color:var(--brass-deep);}
+  .bar{height:7px;background:var(--bone);border-radius:999px;margin-top:6px;overflow:hidden;}
+  .bar span{display:block;height:100%;border-radius:999px;}
+  .comp-note{font-size:11.5px;color:var(--stone);margin-top:5px;}
+  .arith{font-family:var(--label);font-size:10.5px;letter-spacing:.04em;color:var(--stone);margin-top:14px;padding-top:12px;border-top:1px solid var(--bone);}
+  /* generic tables */
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--bone);vertical-align:top;}
+  th{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--stone);}
+  td.tabular{font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .ok{color:var(--forest);font-weight:600;} .gap{color:var(--brass-deep);font-weight:600;} .base{color:var(--stone);}
+  .pill{display:inline-block;font-family:var(--label);font-weight:600;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:2px 8px;}
+  .pill.res{background:#EAF3EC;color:var(--forest);border:1px solid #B8E0A4;}
+  .pill.ref{background:var(--veil);color:var(--brass-deep);border:1px solid var(--bone);}
+  .pill.obs{background:#EFEAF5;color:#6b5b8a;border:1px solid #d3c8e0;}
+  /* evidence grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+  .thumb{border:1px solid var(--bone);border-radius:8px;overflow:hidden;background:#fff;}
+  .thumb img{display:block;width:100%;height:150px;object-fit:cover;}
+  .thumb .cap{font-size:10.5px;color:var(--stone);padding:6px 8px;}
+  .coverage{font-family:var(--label);font-weight:600;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--stone);margin-top:12px;}
+  /* value */
+  .value-band{background:var(--obsidian);color:var(--parchment);border-radius:12px;padding:24px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-top:8px;}
+  .value-band .num{font-family:var(--serif);font-size:34px;color:var(--parchment);}
+  .value-band .num small{font-size:16px;color:var(--ash);}
+  .value-band .vt{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass-light,#D4A565);}
+  .value-band .grade{font-family:var(--label);font-weight:600;font-size:9px;letter-spacing:.16em;text-transform:uppercase;background:var(--brass);color:var(--obsidian);border-radius:999px;padding:4px 12px;}
+  .ledger td .eff{font-family:var(--label);font-weight:600;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;}
+  .eff.up{color:var(--forest);} .eff.hold{color:var(--brass-deep);} .eff.info{color:var(--stone);}
+  .action{display:flex;gap:12px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--bone);}
+  .action .n{font-family:var(--serif);font-size:20px;color:var(--brass);flex:none;width:24px;}
+  .action b{color:var(--obsidian);}
+  .action .fx{font-family:var(--label);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);}
+  /* attestation */
+  .attest{background:var(--obsidian);color:var(--ash);border-radius:12px;padding:24px 28px;margin-top:20px;font-size:12px;line-height:1.6;}
+  .attest h2{color:var(--parchment);font-size:18px;}
+  .attest .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin:14px 0;}
+  .attest b{font-family:var(--label);font-weight:600;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);display:block;}
+  .attest code{font-family:ui-monospace,monospace;font-size:10px;color:var(--mint);word-break:break-all;}
+  .attest .liability{color:var(--ash);font-size:11px;border-top:1px solid #35302a;padding-top:14px;margin-top:14px;}
+  .guide{background:var(--veil);border:1px solid var(--bone);border-radius:10px;padding:18px 22px;margin-top:20px;font-size:11.5px;color:var(--stone);line-height:1.7;}
+  .guide b{color:var(--graphite);}
+  footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--bone);font-size:11.5px;color:var(--stone);}
+  footer a{color:var(--brass-deep);}
+  @media(max-width:720px){.verdict{grid-template-columns:1fr;}.meta-strip{grid-template-columns:1fr 1fr;}.grid{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="demo-banner">
+    <span class="tag">Live co-pilot draft</span>
+    <span>Drafted by the veradis co-pilot from nine owner photographs, in minutes — <b>provisional, pending curator confirmation.</b> This is the working output an expert reviews and signs, not a certified appraisal.</span>
+  </div>
+
+  <div class="brandline">
+    <svg class="prism" viewBox="0 0 24 24" fill="none"><path d="M12 2 22 8v8L12 22 2 16V8L12 2Z" stroke="#8A6420" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 2v20M2 8l10 6 10-6" stroke="#1A4533" stroke-width="1.3" stroke-linejoin="round"/></svg>
+    veradis · Verify + Appraise dossier
+  </div>
+
+  <span class="kicker">Provenance Confidence Score + indicative value</span>
+  <h1>2007 Royal Canadian Mint Proof Set<br>— <em>Celebrating Thayendanegea</em> (Joseph Brant)</h1>
+  <p class="subline">The "Double Dollar" annual proof set · RCM product #6260007 · eight coins, book-style case + certificate.</p>
+
+  <div class="meta-strip">
+    <div><b>Report</b>PCS-CA-2026-0007 · v01</div>
+    <div><b>Effective date</b>12 July 2026</div>
+    <div><b>Method / snapshot</b>PCS v21 · snap 2026-07-12</div>
+    <div><b>Basis</b>Documentary + visual</div>
+  </div>
+
+  <!-- SCOPE -->
+  <section>
+    <span class="kicker">Scope &amp; intended use</span>
+    <div class="scope">
+      <p>Prepared for the owner, for personal record, sale, or an insurance conversation. Value type below is <b>indicative fair market value</b> — <b>not a certified appraisal, and not a certificate of authenticity.</b> The score reflects the maker's record and the documented composition against the object as photographed.</p>
+      <p class="fixed-line">veradis' fee is fixed and does not depend on the value concluded.</p>
+      <p class="fixed-line">Values and registry results are as of the effective date; insurers typically require re-verification after 12–36 months.</p>
+    </div>
+  </section>
+
+  <!-- CORRECTION / attribute-from-image -->
+  <section>
+    <span class="kicker">What you sent us vs. what it is</span>
+    <div class="correction">
+      <p>You submitted this as <b>"Canadian Proof Set 2007."</b> Correct — and we've resolved it to the exact product from the photographs and the certificate: the <b>2007 "Double Dollar" Proof Set celebrating Thayendanegea (Joseph Brant)</b>, RCM #6260007. One honest correction to a common assumption: <b>this is not an all-silver set.</b> Six of the eight coins are .925 sterling silver; the <b>1-cent (copper) and the $1 loonie (nickel/bronze) are base metal</b> by design. Don't pay — or insure — a silver premium on those two.</p>
+    </div>
+  </section>
+
+  <!-- VERDICT -->
+  <section>
+    <span class="kicker">The verdict</span>
+    <h2>Provenance Confidence Score</h2>
+    <div class="verdict">
+      <div>
+        <div class="ring"><div class="inner"><span class="pcs-num">85</span><span class="pcs-ci">± 6 · 95% CI</span></div></div>
+        <span class="tier">Silver · lower bound 79</span>
+        <span class="proj">Projects to Gold after a metal-weight check</span>
+      </div>
+      <div>
+        <div class="comp">
+          <div class="comp-head"><b>Identity</b><span class="score">95</span></div>
+          <div class="bar"><span style="width:95%;background:var(--forest);"></span></div>
+          <div class="comp-note">Product, year and mintage resolved against the RCM record and the in-hand certificate (35,606 / 60,000). <span class="pill res">Authority-resolved</span></div>
+        </div>
+        <div class="comp">
+          <div class="comp-head"><b>Custody &amp; story</b><span class="score">86</span></div>
+          <div class="bar"><span style="width:86%;background:var(--forest);"></span></div>
+          <div class="comp-note">Original RCM issue, complete in the maroon book-case with the numbered certificate. No prior-owner receipt — normal for a modern mint product. <span class="pill res">Authority-resolved</span></div>
+        </div>
+        <div class="comp">
+          <div class="comp-head"><b>Material integrity</b><span class="score low">70</span></div>
+          <div class="bar"><span style="width:70%;background:var(--brass);"></span></div>
+          <div class="comp-note"><b>Held on documentary + visual.</b> Proof finish and the dollar's selective gold plating are consistent with a genuine set; composition is <b>not yet confirmed by weight or XRF</b>. This is the gap that widens the interval — a scale closes it. <span class="pill ref">Reference</span></div>
+        </div>
+        <div class="comp">
+          <div class="comp-head"><b>Risk profile</b><span class="score">90</span></div>
+          <div class="bar"><span style="width:90%;background:var(--forest);"></span></div>
+          <div class="comp-note">Mass modern issue; no theft, sanctions or dispute flag applies. Capped at 90 while stolen-property registry coverage is partial — the cap is the method naming its own limit, not a flag against the set.</div>
+        </div>
+        <div class="arith">(95 × .30) + (86 × .30) + (70 × .25) + (90 × .15) = 85.3, reported as <b>85</b> · tier assigned on the lower bound (79) · missing checks widen the ±, they do not lower the score.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REGISTRY SWEEP -->
+  <section>
+    <span class="kicker">Registry sweep</span>
+    <h2>What we checked, and when</h2>
+    <table>
+      <thead><tr><th>Registry</th><th>Result</th><th>Checked</th></tr></thead>
+      <tbody>
+        <tr><td>OFAC / SECO / EU / UK sanctions (owner party)</td><td class="ok">Clear</td><td class="tabular">12 Jul 2026</td></tr>
+        <tr><td>Counterfeit-coin advisories (RCM / community)</td><td class="ok">No match — genuine RCM product line</td><td class="tabular">12 Jul 2026</td></tr>
+        <tr><td>Stolen-property (Art Loss Register)</td><td class="gap">Not run — coverage gap</td><td class="tabular">—</td></tr>
+      </tbody>
+    </table>
+    <p class="fixed-line">"Clear" means no match in the named registry on the check date — it never means "not stolen." No real-time stolen-object registry exists for modern mint sets; the Risk cap above reflects this.</p>
+  </section>
+
+  <!-- MATERIAL CHARACTERISATION -->
+  <section>
+    <span class="kicker">Material characterisation</span>
+    <h2>Declared · observed · reference</h2>
+    <table>
+      <thead><tr><th>Coin</th><th>Composition (RCM spec)</th><th>Silver?</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>1¢</td><td>Copper (2.5 g)</td><td class="base">Base metal</td><td><span class="pill obs">Visual OK</span></td></tr>
+        <tr><td>5¢</td><td>.925 sterling silver (5.35 g)</td><td class="ok">Silver</td><td><span class="pill ref">Weight pending</span></td></tr>
+        <tr><td>10¢ (Bluenose)</td><td>.925 sterling silver (2.4 g)</td><td class="ok">Silver</td><td><span class="pill ref">Weight pending</span></td></tr>
+        <tr><td>25¢ (caribou)</td><td>.925 sterling silver (5.9 g)</td><td class="ok">Silver</td><td><span class="pill ref">Weight pending</span></td></tr>
+        <tr><td>50¢ (arms)</td><td>.925 sterling silver (9.3 g)</td><td class="ok">Silver</td><td><span class="pill ref">Weight pending</span></td></tr>
+        <tr><td>$1 loonie</td><td>Nickel electroplated bronze (7 g)</td><td class="base">Base metal</td><td><span class="pill obs">Visual OK</span></td></tr>
+        <tr><td>$2 toonie</td><td>.925 sterling silver, single alloy (8.83 g)</td><td class="ok">Silver</td><td><span class="pill ref">Weight pending</span></td></tr>
+        <tr><td>$1 Thayendanegea</td><td>.925 sterling silver (25.18 g) + selective gold plate</td><td class="ok">Silver</td><td><span class="pill obs">Gold plate visible</span></td></tr>
+      </tbody>
+    </table>
+    <p class="comp-note">Approx. total silver content ≈ <b>1.69 troy oz ASW</b>. Weighing the six silver coins on a 0.01 g scale confirms composition in two minutes and lifts Material toward Gold.</p>
+  </section>
+
+  <!-- EVIDENCE -->
+  <section>
+    <span class="kicker">Evidence on file</span>
+    <h2>Nine photographs, hashed at intake</h2>
+    <div class="grid">
+      <div class="thumb"><img src="IMG_2349.jpg" alt="reverse tray, 8 coins"><div class="cap">Reverse tray · all 8 coins · gold-plated dollar</div></div>
+      <div class="thumb"><img src="IMG_2350.jpg" alt="obverse tray"><div class="cap">Obverse tray · Susanna Blunt effigy · mint marks</div></div>
+      <div class="thumb"><img src="IMG_2353.jpg" alt="case, slipcase, certificate"><div class="cap">Book-case, black slipcase &amp; certificate</div></div>
+      <div class="thumb"><img src="IMG_2356.jpg" alt="certificate English"><div class="cap">Certificate · Thayendanegea theme (EN)</div></div>
+      <div class="thumb"><img src="IMG_2355.jpg" alt="mintage line"><div class="cap">Certificate · mintage 35,606 / 60,000</div></div>
+      <div class="thumb"><img src="IMG_2348.jpg" alt="outer cover RCM"><div class="cap">Maroon cover · RCM logo mark</div></div>
+    </div>
+    <p class="coverage">Coverage 6 / 10 core views · <b>next most valuable capture: a 0.01 g scale weight of each silver coin</b> (confirms composition → Gold), then raking-light macros of the mirror fields (condition / milk-spot check).</p>
+  </section>
+
+  <!-- CHECKS -->
+  <section>
+    <span class="kicker">Checks</span>
+    <h2>Every claim, and where it resolved</h2>
+    <table>
+      <thead><tr><th>Check</th><th>Result</th><th>Authority</th></tr></thead>
+      <tbody>
+        <tr><td>Product identity (RCM #6260007, Double Dollar)</td><td class="ok">Match</td><td>RCM record + certificate <span class="pill res">Resolved</span></td></tr>
+        <tr><td>Year (2007)</td><td class="ok">Match</td><td>Spine, coins, certificate <span class="pill res">Resolved</span></td></tr>
+        <tr><td>Mintage (35,606 / 60,000)</td><td class="ok">Confirmed</td><td>In-hand certificate <span class="pill res">Resolved</span></td></tr>
+        <tr><td>Completeness (8 of 8 coins present)</td><td class="ok">Complete</td><td>Photographs, both trays <span class="pill obs">Observed</span></td></tr>
+        <tr><td>Commemorative $1 selective gold plating</td><td class="ok">Present</td><td>Photograph <span class="pill obs">Observed</span></td></tr>
+        <tr><td>Composition (6 silver / 2 base)</td><td class="ok">Consistent</td><td>RCM spec <span class="pill ref">Reference</span></td></tr>
+        <tr><td>Silver weight verification</td><td class="gap">Held open</td><td>Needs a scale / XRF <span class="pill ref">Pending</span></td></tr>
+        <tr><td>Surface condition (milk-spot / hairlines)</td><td class="gap">Held open</td><td>Needs raking-light macros <span class="pill obs">Partial</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- APPRAISE -->
+  <section>
+    <span class="kicker">Appraise · what it's worth</span>
+    <h2>Indicative fair market value</h2>
+    <div class="value-band">
+      <div>
+        <div class="vt">Fair market value · complete set, box + certificate</div>
+        <div class="num">CAD $210 – $285 <small>(CHF ≈ 126 – 171)</small></div>
+      </div>
+      <div style="text-align:right;">
+        <div class="grade">Grade · Informed</div>
+        <div style="font-size:11.5px;color:var(--ash);margin-top:8px;">Melt floor ≈ CAD $135–140<br>(silver ≈ US$59/oz, Jul 2026)</div>
+      </div>
+    </div>
+    <p class="comp-note" style="margin-top:14px;">Owner currency leads; CHF at 0.6. This is a <b>bullion-plus set, not a numismatic rarity</b> — value tracks the silver spot more than scarcity. The recent uplift is silver-driven; a decade ago the set traded closer to CAD $60–100.</p>
+
+    <h2 style="margin-top:28px;">Comparable sales</h2>
+    <table>
+      <thead><tr><th>Source</th><th>Result</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr><td>eBay — realized sale (complete set)</td><td class="tabular">US $190.60 (≈ CAD $260)</td><td class="base">Confirmed close</td></tr>
+        <tr><td>Century Stamps — dealer ask</td><td class="tabular">CAD $209.95</td><td class="base">Ask (cosmetic caveat)</td></tr>
+        <tr><td>eBay Canada — active ask</td><td class="tabular">≈ CAD $329</td><td class="base">Ask · excluded from band</td></tr>
+        <tr><td>Intrinsic silver (≈1.69 oz ASW)</td><td class="tabular">≈ CAD $135–140</td><td class="base">Melt floor</td></tr>
+      </tbody>
+    </table>
+
+    <h2 style="margin-top:28px;">Factor ledger</h2>
+    <table class="ledger">
+      <tbody>
+        <tr><td>Silver spot at ~US$59/oz (Jul 2026)</td><td><span class="eff up">Lifts</span> — sets a high floor</td></tr>
+        <tr><td>Complete, original case + numbered certificate</td><td><span class="eff up">Lifts</span> — full-set, not broken</td></tr>
+        <tr><td>Selective-gold-plated commemorative dollar present</td><td><span class="eff up">Lifts</span> — the value-anchor coin</td></tr>
+        <tr><td>Common product (35,606 issued) — not scarce</td><td><span class="eff hold">Holds</span> — bullion-plus, not rarity</td></tr>
+        <tr><td>Condition unconfirmed (milk-spot / hairlines)</td><td><span class="eff hold">Holds</span> — until macros supplied</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ACTIONS -->
+  <section>
+    <span class="kicker">What raises the score and tightens the value</span>
+    <h2>Three actions, ranked</h2>
+    <div class="action"><span class="n">1</span><div><b>Weigh each silver coin</b> on a 0.01 g scale (or a single XRF pass). <span class="fx">Confirms composition → Material to Gold · narrows the ±</span></div></div>
+    <div class="action"><span class="n">2</span><div><b>Raking-light macro of each coin's mirror field.</b> Resolves milk-spotting / hairlines. <span class="fx">Firms condition · lifts the value band</span></div></div>
+    <div class="action"><span class="n">3</span><div><b>Edge + mint-mark macro</b> on the circulation coins (the 2006+ RCM logo). <span class="fx">Closes the last identity check</span></div></div>
+    <p class="comp-note" style="margin-top:12px;">Each is a named CHF 5 re-run: new evidence provably narrows the interval — it only may move the score.</p>
+  </section>
+
+  <!-- ATTESTATION -->
+  <section>
+    <span class="kicker">Attestation</span>
+    <div class="attest">
+      <h2>What this signature attests</h2>
+      <div class="grid2">
+        <div><b>Report</b>PCS-CA-2026-0007 · v01</div>
+        <div><b>Method / snapshot</b>PCS v21 · 2026-07-12</div>
+        <div><b>Snapshot hash</b><code>sha256: (assigned on issue)</code></div>
+        <div><b>Curator</b><code>pending confirmation</code></div>
+      </div>
+      <p>Reproducibility — re-running this method against this data snapshot reproduces this score to the digit (pinned-seed deterministic pipeline).</p>
+      <p>Falsifiability — this method returns Flagged, with the evidence, when an identity fails its checks; appeals resolve within fourteen days. A verification that cannot say no would be worthless — this one can.</p>
+      <p class="liability">This Provenance Confidence Score is a probabilistic verification report based on digital data analysis cross-referenced against named sources. It is intelligence, not insurance. It reflects the probability of identity match, custody continuity, material integrity, and risk-profile cleanliness based on available data at the time of query. It does not constitute a legal certificate of authentication, a guarantee against loss, or an indemnity against fraud. For high-value transactions, buyers should conduct physical inspection by a qualified specialist. veradis.ai is not liable for financial loss resulting from reliance on this report.</p>
+    </div>
+  </section>
+
+  <!-- READING GUIDE -->
+  <section>
+    <span class="kicker">Reading guide</span>
+    <div class="guide">
+      <p><b>The score (0–100)</b> is the confidence that the object is what it's presented to be, weighted Identity 30 · Custody 30 · Material 25 · Risk 15. <b>The ± is a 95% credible interval;</b> the tier (Gold ≥80 / Silver ≥60 / Bronze ≥40) is assigned on the <b>lower</b> bound — so a wide interval on thin evidence reads honestly as Silver, not a false Gold. <b>Missing checks widen the ±; they never lower the score.</b> <b>Coverage</b> (views on file) is a separate axis from confidence. "Weight pending / held open" means we have not yet checked it — not that it failed. Every gap names the single action that closes it.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>Sources named:</b> Royal Canadian Mint — product #6260007 specification &amp; the in-hand Certificate of Authenticity (primary) · Numista (catalogue) · APMEX (composition / ASW) · eBay realized sale US$190.60 · Century Stamps (dealer) · silver spot ~US$59/oz (APMEX, Jul 2026).</p>
+    <p style="margin-top:8px;">veradis Verify + Appraise · method PCS v21 · Veradis Intelligence INC. (BC1492323, Canada). Indicative — not a certified appraisal, not a certificate of authenticity. <em>Know it's real. Know its story.</em></p>
+  </footer>
+
+</div>
+</body>
+</html>
