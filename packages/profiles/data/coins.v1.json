@@ -1,0 +1,35 @@
+{
+  "category": "coins",
+  "version": 1,
+  "label": "Coins & banknotes",
+  "identityKeys": [
+    { "key": "country", "label": "Country / issuer", "weight": 0.1 },
+    { "key": "denomination", "label": "Denomination", "weight": 0.2 },
+    { "key": "year", "label": "Year of issue", "weight": 0.25 },
+    { "key": "mint_mark", "label": "Mint / mint mark", "weight": 0.2 },
+    { "key": "variety", "label": "Variety / type", "weight": 0.25 }
+  ],
+  "identityNeverKeys": ["serial"],
+  "captureSlots": [
+    { "slotId": "obverse", "label": "Obverse", "guidance": "Full obverse, square to the coin, even light.", "requiredFor": "identity", "core": true },
+    { "slotId": "reverse", "label": "Reverse", "guidance": "Full reverse, square to the coin, even light.", "requiredFor": "identity", "core": true },
+    { "slotId": "edge", "label": "Edge", "guidance": "Edge lettering / reeding, raked light.", "requiredFor": "material", "core": true },
+    { "slotId": "mintmark_macro", "label": "Mint-mark macro", "guidance": "Macro of the mint mark and date.", "requiredFor": "identity", "core": true, "unlocks": ["variety_attribution"] },
+    { "slotId": "slab_label", "label": "Slab label", "guidance": "Grading-service label + cert number, if slabbed.", "requiredFor": "identity", "core": false, "unlocks": ["cert_lookup"] }
+  ],
+  "redFlags": [
+    { "key": "cast_tooled", "label": "Cast or tooled fake", "description": "Casting seams, mushy detail, tooling marks under magnification." },
+    { "key": "altered_date", "label": "Altered date / mint mark", "description": "Re-engraved or added date/mint mark to fake a rare variety." },
+    { "key": "cleaned_whizzed", "label": "Cleaned / whizzed", "description": "Hairlines, unnatural lustre from mechanical cleaning." },
+    { "key": "fake_slab", "label": "Counterfeit slab", "description": "Cloned holder / fake cert number for a genuine-looking grade." }
+  ],
+  "corpusSources": [
+    { "name": "PCGS public API (CoinFacts + APR)", "tier": 1, "role": "ground_truth", "url": "https://api.pcgs.com" },
+    { "name": "Numista (with image-ID)", "tier": 1, "role": "ground_truth", "url": "https://en.numista.com" },
+    { "name": "acsearch.info (die-match)", "tier": 2, "role": "corroboration", "url": "https://www.acsearch.info" },
+    { "name": "Newman Numismatic Portal", "tier": 2, "role": "corroboration", "url": "https://nnp.wustl.edu" },
+    { "name": "VarietyVista / CONECA", "tier": 2, "role": "corroboration", "url": "https://varietyvista.com" }
+  ],
+  "compKeys": ["denomination", "year", "mint_mark", "variety", "grade"],
+  "materialSlotClass": "surface_strike_luster"
+}
