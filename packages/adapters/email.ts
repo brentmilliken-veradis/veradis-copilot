@@ -29,7 +29,7 @@ export class StubEmailer implements Emailer {
   }
 }
 
-const FROM = process.env.EMAIL_FROM ?? "veradis.ai <reports@veradis.ai>";
+const FROM = process.env.EMAIL_FROM ?? "veradis <reports@veradis.ai>";
 
 /** Resend over plain fetch — no SDK dependency. */
 export class ResendEmailer implements Emailer {
