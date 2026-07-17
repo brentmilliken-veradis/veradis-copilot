@@ -77,13 +77,16 @@ export async function enrich(
   );
 
   // ── Identity ────────────────────────────────────────────────────────────
+  const normv = (v: string): string => v.trim().toLowerCase();
   const identity: IdentityCheckInput[] = [];
   for (const idKey of profile.identityKeys) {
     const value = resolvedAttributes[idKey.key];
+    const claimed = declaredAttributes[idKey.key];
     let authorityState: AuthorityState;
     let credit: number;
     let present: boolean;
     let result: CheckOutcome;
+    let note: string | null = null;
     let citation: { name: string; url?: string; retrievalState: "retrieved" | "pending"; tier: 1 | 2 | 4 } | null;
 
     if (!value) {
@@ -91,6 +94,7 @@ export async function enrich(
       credit = 0;
       present = false;
       result = "gap_held_open";
+      note = "attribute not supplied";
       const t1 = adapters.sources.find((a) => a.tier === 1 && a.categories.includes(report.category));
       citation = t1 ? { name: t1.name, retrievalState: "pending", tier: 1 } : null;
     } else {
@@ -117,11 +121,36 @@ export async function enrich(
           const src = String(top[0].chunk.metadataJson.source ?? "corpus");
           citation = { name: src, retrievalState: "retrieved", tier: 2 };
         } else {
-          authorityState = "declared";
-          credit = 0.5;
-          present = true;
-          result = correctedKeys.has(idKey.key) ? "corrected" : "observed";
-          citation = { name: "Owner declaration", retrievalState: "retrieved", tier: 4 };
+          // F-2 (D-2): vision may only downgrade. With neither Tier-1 nor
+          // corpus corroboration, a value that exists only because vision
+          // changed or supplied it is never scored ground truth:
+          //  - vision CHANGED the declaration → assessed conflict, zero credit
+          //    (lowers vs the declared-only 0.5 baseline);
+          //  - vision ADDED a value the owner never declared → treated exactly
+          //    like a missing attribute (cannot lift the score).
+          const visionChanged = claimed !== undefined && normv(claimed) !== normv(value);
+          const visionAdded = claimed === undefined;
+          if (visionChanged) {
+            authorityState = "declared";
+            credit = 0;
+            present = true;
+            result = "corrected";
+            note = "vision-derived value conflicts with the declaration and has no corroborating source — not credited";
+            citation = { name: "Vision (uncorroborated)", retrievalState: "pending", tier: 4 };
+          } else if (visionAdded) {
+            authorityState = "declared";
+            credit = 0;
+            present = false;
+            result = "gap_held_open";
+            note = "vision-derived value has no corroborating source — held open, not credited";
+            citation = { name: "Vision (uncorroborated)", retrievalState: "pending", tier: 4 };
+          } else {
+            authorityState = "declared";
+            credit = 0.5;
+            present = true;
+            result = "observed";
+            citation = { name: "Owner declaration", retrievalState: "retrieved", tier: 4 };
+          }
         }
       }
     }
@@ -142,7 +171,7 @@ export async function enrich(
       result,
       authorityState,
       sourceId: sourceRow?.id ?? null,
-      note: value ? null : "attribute not supplied",
+      note,
     });
     identity.push({ key: idKey.key, weight: idKey.weight, credit, present, authorityState });
   }
