@@ -260,6 +260,13 @@ export class SupabaseRepository implements Repository {
     return rows.length ? mapReport(rows[0]) : null;
   }
 
+  async listReportsByStatus(status: Report["status"], limit: number): Promise<Report[]> {
+    const rows = await this.rest(
+      `report?status=eq.${encodeURIComponent(status)}&order=created_at.asc&limit=${limit}`,
+    );
+    return rows.map(mapReport);
+  }
+
   async updateReport(
     id: string,
     patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,

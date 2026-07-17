@@ -85,8 +85,8 @@ export function declaredAttributesFor(category: Category, obj: AccountsObjectRow
   return attrs;
 }
 
-/** F-12: EMAIL B must never sink a row. Failure is logged; the produced-branch
- *  retry re-sends it on the next tick (the email_log is the dedupe). */
+/** F-12: EMAIL B must never sink a row. Failure is logged; the R-5 sweep
+ *  re-sends it on a later tick (the email_log is the dedupe). */
 async function sendCuratorReviewSafely(
   deps: ReportPollerDeps,
   order: Order,
@@ -96,8 +96,35 @@ async function sendCuratorReviewSafely(
   try {
     await sendCuratorReview(deps.repo, deps.emailer, order, reportId, tier);
   } catch (e) {
-    console.error(`report poller ${order.id}: curator review email failed (will retry next tick):`, e);
+    console.error(`report poller ${order.id}: curator review email failed (sweep will retry):`, e);
   }
+}
+
+/** How many provisional reports one sweep tick inspects (bounded — F-6). */
+const CURATOR_EMAIL_SWEEP_LIMIT = 50;
+
+/** R-5: queue-INDEPENDENT curator-email self-heal. A delivery that succeeded
+ *  takes the accounts row out of in_production, so a lost EMAIL B can never be
+ *  healed off that queue. Instead: any copilot report still provisional with
+ *  no curator_review entry in the copilot email_log gets a resend; email_log
+ *  is the dedupe, so a sent email is never sent twice. */
+export async function sweepCuratorEmails(deps: ReportPollerDeps): Promise<number> {
+  const provisional = await deps.repo.listReportsByStatus("provisional", CURATOR_EMAIL_SWEEP_LIMIT);
+  let resent = 0;
+  for (const report of provisional) {
+    try {
+      const emails = await deps.repo.listEmails(report.orderId);
+      if (emails.some((e) => e.kind === "curator_review")) continue;
+      const order = await deps.repo.getOrder(report.orderId);
+      if (!order) continue; // e.g. the dev-seeded fixture report
+      const version = await deps.repo.getLatestVersion(report.id);
+      await sendCuratorReview(deps.repo, deps.emailer, order, report.id, version?.tier ?? "bronze");
+      resent++;
+    } catch (e) {
+      console.error(`curator email sweep: resend failed for report ${report.id} (will retry next tick):`, e);
+    }
+  }
+  return resent;
 }
 
 async function downloadPhotos(deps: ReportPollerDeps, obj: AccountsObjectRow): Promise<PhotoInput[]> {
@@ -146,14 +173,9 @@ export async function processAccountsReport(
           return { reportId: row.id, outcome: "failed", reason: "order exists but no copilot report/version" };
         }
         const redo = await deliverReport(deps.accounts, copilotReport, version);
-        // F-12: if the curator email was lost on the original pass, retry it
-        // here — never let a notify failure strand the review queue.
-        if (copilotReport.status === "provisional") {
-          const emails = await deps.repo.listEmails(row.id);
-          if (!emails.some((e) => e.kind === "curator_review")) {
-            await sendCuratorReviewSafely(deps, existingOrder, copilotReport.id, version.tier ?? "bronze");
-          }
-        }
+        // (Curator-email recovery lives in sweepCuratorEmails — R-5. This
+        // branch only fires while the accounts row is still in_production, so
+        // it could never heal an email lost AFTER a successful delivery.)
         return redo.delivered
           ? { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" }
           : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
@@ -279,10 +301,13 @@ export interface PollSummary {
   delivered: number;
   skipped: number;
   failed: number;
+  /** R-5: curator-review emails re-sent by the queue-independent sweep. */
+  curatorEmailsResent: number;
   results: ProcessedReport[];
 }
 
-/** One cron tick: drain the in_production queue, isolating failures per row. */
+/** One cron tick: drain the in_production queue (failures isolated per row),
+ *  then run the curator-email sweep (R-5). */
 export async function pollReports(deps: ReportPollerDeps): Promise<PollSummary> {
   const rows = await deps.accounts.listInProductionReports();
   const results: ProcessedReport[] = [];
@@ -294,11 +319,13 @@ export async function pollReports(deps: ReportPollerDeps): Promise<PollSummary> 
       results.push({ reportId: row.id, outcome: "failed", reason: (e as Error).message });
     }
   }
+  const curatorEmailsResent = await sweepCuratorEmails(deps);
   return {
     polled: rows.length,
     delivered: results.filter((r) => r.outcome === "delivered").length,
     skipped: results.filter((r) => r.outcome === "skipped").length,
     failed: results.filter((r) => r.outcome === "failed").length,
+    curatorEmailsResent,
     results,
   };
 }

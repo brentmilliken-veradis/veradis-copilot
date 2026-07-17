@@ -138,7 +138,10 @@ describe("pollReports", () => {
     expect(accounts.uploads[0].reportId).toBe("rep-1");
     expect(accounts.uploads[0].html).toContain("Provenance Confidence Score");
     expect(accounts.patches[0].patch.status).toBe("delivered");
-    expect(typeof accounts.patches[0].patch.pcs_score).toBe("number");
+    // R-4: a painting is an uncalibrated (capped) category — the structured
+    // pcs_score is withheld; the delivered HTML carries the capped verdict.
+    expect(accounts.patches[0].patch.pcs_score).toBeUndefined();
+    expect(accounts.uploads[0].html).toContain("This category is not yet calibrated");
 
     // Copilot side: order (id = accounts report id) + provisional report + EMAIL B.
     const order = await d.repo.getOrder("rep-1");
@@ -191,7 +194,7 @@ describe("pollReports", () => {
     expect(byId["rep-3"].reason).toMatch(/not found/);
   });
 
-  it("F-12: a failing curator email never sinks the row; the produced-branch retry re-sends it", async () => {
+  it("R-5: delivery succeeds + curator email throws → the SWEEP re-sends exactly once", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);
     const d = deps(accounts);
@@ -203,15 +206,23 @@ describe("pollReports", () => {
       },
     };
 
+    // Tick 1: delivery succeeds (row leaves in_production), email lost.
     const first = await pollReports(d);
-    expect(first.results[0].outcome).toBe("delivered"); // email failure did not fail the row
+    expect(first.results[0].outcome).toBe("delivered");
+    expect(accounts.queue[0].status).toBe("delivered"); // gone from the queue — the old retry could never fire
     expect((await d.repo.listEmails("rep-1")).some((e) => e.kind === "curator_review")).toBe(false);
 
-    // Next tick: row surfaces again (write-back lost), email service recovered.
-    accounts.queue[0].status = "in_production";
+    // Tick 2: queue is EMPTY; the email_log-driven sweep re-sends.
     emailBroken = false;
-    await pollReports(d);
-    expect((await d.repo.listEmails("rep-1")).some((e) => e.kind === "curator_review")).toBe(true);
+    const second = await pollReports(d);
+    expect(second.polled).toBe(0);
+    expect(second.curatorEmailsResent).toBe(1);
+    expect((await d.repo.listEmails("rep-1")).filter((e) => e.kind === "curator_review")).toHaveLength(1);
+
+    // Tick 3: dedupe on email_log — never sent twice.
+    const third = await pollReports(d);
+    expect(third.curatorEmailsResent).toBe(0);
+    expect((await d.repo.listEmails("rep-1")).filter((e) => e.kind === "curator_review")).toHaveLength(1);
   });
 
   it("F-5a: two concurrent ticks over one row — one claims + delivers, one skips, one pipeline run", async () => {

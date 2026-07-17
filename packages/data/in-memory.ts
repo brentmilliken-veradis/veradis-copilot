@@ -155,6 +155,15 @@ export class InMemoryRepository implements Repository {
     return null;
   }
 
+  async listReportsByStatus(status: Report["status"], limit: number): Promise<Report[]> {
+    const out: Report[] = [];
+    for (const r of this.reports.values()) {
+      if (r.status === status) out.push({ ...r });
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
   async updateReport(
     id: string,
     patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,
