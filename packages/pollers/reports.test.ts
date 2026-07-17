@@ -191,6 +191,29 @@ describe("pollReports", () => {
     expect(byId["rep-3"].reason).toMatch(/not found/);
   });
 
+  it("F-12: a failing curator email never sinks the row; the produced-branch retry re-sends it", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    let emailBroken = true;
+    d.emailer = {
+      send: async (msg) => {
+        if (emailBroken) throw new Error("resend down");
+        return { providerId: `ok-${msg.subject}` };
+      },
+    };
+
+    const first = await pollReports(d);
+    expect(first.results[0].outcome).toBe("delivered"); // email failure did not fail the row
+    expect((await d.repo.listEmails("rep-1")).some((e) => e.kind === "curator_review")).toBe(false);
+
+    // Next tick: row surfaces again (write-back lost), email service recovered.
+    accounts.queue[0].status = "in_production";
+    emailBroken = false;
+    await pollReports(d);
+    expect((await d.repo.listEmails("rep-1")).some((e) => e.kind === "curator_review")).toBe(true);
+  });
+
   it("F-5a: two concurrent ticks over one row — one claims + delivers, one skips, one pipeline run", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);

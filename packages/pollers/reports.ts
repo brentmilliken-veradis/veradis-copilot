@@ -6,14 +6,14 @@
 // a re-poll only retries the missing half (production or delivery); a failed
 // row stays in_production and is retried next tick.
 
-import type { Category } from "@/packages/pcs-types";
+import type { Category, Tier } from "@/packages/pcs-types";
 import { ALL_CATEGORIES } from "@/packages/pcs-types";
 import type {
   AccountsObjectRow,
   AccountsProfileRow,
   AccountsReportRow,
 } from "@/packages/adapters/accounts";
-import { DuplicateOrderError, type Repository } from "@/packages/data/repository";
+import { DuplicateOrderError, type Order, type Repository } from "@/packages/data/repository";
 import type { Storage } from "@/packages/adapters/storage";
 import type { Emailer } from "@/packages/adapters/email";
 import { normalizePhoto } from "@/packages/adapters/photos";
@@ -85,6 +85,21 @@ export function declaredAttributesFor(category: Category, obj: AccountsObjectRow
   return attrs;
 }
 
+/** F-12: EMAIL B must never sink a row. Failure is logged; the produced-branch
+ *  retry re-sends it on the next tick (the email_log is the dedupe). */
+async function sendCuratorReviewSafely(
+  deps: ReportPollerDeps,
+  order: Order,
+  reportId: string,
+  tier: Tier,
+): Promise<void> {
+  try {
+    await sendCuratorReview(deps.repo, deps.emailer, order, reportId, tier);
+  } catch (e) {
+    console.error(`report poller ${order.id}: curator review email failed (will retry next tick):`, e);
+  }
+}
+
 async function downloadPhotos(deps: ReportPollerDeps, obj: AccountsObjectRow): Promise<PhotoInput[]> {
   const photos: PhotoInput[] = [];
   for (const path of obj.photo_paths ?? []) {
@@ -131,6 +146,14 @@ export async function processAccountsReport(
           return { reportId: row.id, outcome: "failed", reason: "order exists but no copilot report/version" };
         }
         const redo = await deliverReport(deps.accounts, copilotReport, version);
+        // F-12: if the curator email was lost on the original pass, retry it
+        // here — never let a notify failure strand the review queue.
+        if (copilotReport.status === "provisional") {
+          const emails = await deps.repo.listEmails(row.id);
+          if (!emails.some((e) => e.kind === "curator_review")) {
+            await sendCuratorReviewSafely(deps, existingOrder, copilotReport.id, version.tier ?? "bronze");
+          }
+        }
         return redo.delivered
           ? { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" }
           : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
@@ -234,7 +257,7 @@ export async function processAccountsReport(
   const delivery = await deliverReport(deps.accounts, result.report, result.version);
 
   if (result.report.status === "provisional") {
-    await sendCuratorReview(deps.repo, deps.emailer, order, result.report.id, result.score.tier); // EMAIL B
+    await sendCuratorReviewSafely(deps, order, result.report.id, result.score.tier); // EMAIL B
   }
 
   if (!delivery.delivered) {

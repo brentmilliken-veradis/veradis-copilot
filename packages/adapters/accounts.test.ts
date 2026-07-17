@@ -85,6 +85,24 @@ describe("VeradisAccountsClient", () => {
       /accounts report update 403/,
     );
   });
+
+  it("F-12: upstream error bodies never appear in the thrown message", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("SECRET-UPSTREAM-DETAIL", { status: 500 })));
+    const client = new VeradisAccountsClient(URL_BASE, KEY);
+    for (const call of [
+      () => client.updateReport("rep-1", { status: "delivered", file_path: "p", delivered_at: "t" }),
+      () => client.downloadObjectPhoto("user-1/a.jpg"),
+      () => client.listInProductionReports(),
+    ]) {
+      const err = await call().then(
+        () => null,
+        (e: Error) => e,
+      );
+      expect(err).toBeTruthy();
+      expect(err!.message).not.toContain("SECRET-UPSTREAM-DETAIL");
+      expect(err!.message).toContain("500");
+    }
+  });
 });
 
 describe("getAccountsClient factory", () => {

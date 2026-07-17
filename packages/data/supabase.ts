@@ -218,7 +218,12 @@ export class SupabaseRepository implements Repository {
         ...(init.headers as Record<string, string> | undefined),
       },
     });
-    if (!res.ok) throw new RestError(`repo:supabase ${init.method ?? "GET"} ${pathAndQuery} → ${res.status} ${await res.text()}`, res.status);
+    if (!res.ok) {
+      // F-12: log the upstream body server-side; the thrown message (which can
+      // surface as per-row reason/detail) carries only the path + status.
+      console.error(`repo:supabase ${init.method ?? "GET"} ${pathAndQuery} → ${res.status}: ${await res.text()}`);
+      throw new RestError(`repo:supabase ${init.method ?? "GET"} ${pathAndQuery} failed (${res.status})`, res.status);
+    }
     const text = await res.text();
     if (!text) return [];
     const parsed = JSON.parse(text) as unknown;

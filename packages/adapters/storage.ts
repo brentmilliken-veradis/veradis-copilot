@@ -38,6 +38,14 @@ export class StubStorage implements Storage {
 
 const DEFAULT_BUCKET = "verify-uploads";
 
+/** F-12: upstream error bodies are logged server-side, never thrown — thrown
+ *  messages become per-row `reason`/`detail` strings on the cron surface. */
+async function failUpstream(label: string, res: Response): Promise<never> {
+  console.error(`${label} ${res.status}: ${await res.text()}`);
+  throw new Error(`${label} ${res.status}`);
+}
+
+
 /** F-7: reject traversal before encoding — encodeURIComponent keeps '..'. */
 function assertSafeStoragePath(path: string): void {
   if (!path || path.startsWith("/") || path.includes("\\")) {
@@ -82,14 +90,14 @@ export class SupabaseStorage implements Storage {
       },
       body: new Uint8Array(bytes), // fresh view keeps fetch body typing happy
     });
-    if (!res.ok) throw new Error(`storage:supabase put ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream("storage:supabase put", res);
     return { path, sha256: sha256Hex(bytes), bytes: bytes.byteLength };
   }
 
   async get(path: string): Promise<Uint8Array | null> {
     const res = await fetch(this.objectUrl(path), { headers: this.headers() });
     if (res.status === 400 || res.status === 404) return null; // Supabase reports missing keys as 400/404
-    if (!res.ok) throw new Error(`storage:supabase get ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream("storage:supabase get", res);
     return new Uint8Array(await res.arrayBuffer());
   }
 }

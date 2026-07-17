@@ -144,9 +144,24 @@ describe("SupabaseRepository", () => {
     expect(chunks[0].metadataJson).toEqual({ source: "x" });
   });
 
-  it("throws with context on an HTTP error", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("boom", { status: 500 })));
-    await expect(repo().getReport("r-1")).rejects.toThrow(/repo:supabase GET report/);
+  it("throws with context on an HTTP error — without the upstream body (F-12)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("SECRET-UPSTREAM-DETAIL", { status: 500 })));
+    const err = await repo()
+      .getReport("r-1")
+      .then(
+        () => null,
+        (e: Error) => e,
+      );
+    expect(err!.message).toMatch(/repo:supabase GET report/);
+    expect(err!.message).toContain("500");
+    expect(err!.message).not.toContain("SECRET-UPSTREAM-DETAIL");
+  });
+
+  it("createOrder maps a 409 unique violation to DuplicateOrderError (F-5a)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('{"code":"23505"}', { status: 409 })));
+    await expect(
+      repo().createOrder({ id: "acc-rep-1", tallySubmissionId: "veradis:acc-rep-1", email: "c@x.com", ownerName: null, category: "coins", sku: "verify" }),
+    ).rejects.toThrow(/already exists/);
   });
 });
 

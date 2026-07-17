@@ -9,6 +9,14 @@
 // the account app belong to the account-template session.
 
 const OBJECT_PHOTOS_BUCKET = "object-photos"; // objects.photo_paths point here
+
+/** F-12: upstream error bodies are logged server-side, never thrown — thrown
+ *  messages become per-row `reason`/`detail` strings on the cron surface. */
+async function failUpstream(label: string, res: Response): Promise<never> {
+  console.error(`${label} ${res.status}: ${await res.text()}`);
+  throw new Error(`${label} ${res.status}`);
+}
+
 const REPORT_FILES_BUCKET = "report-files"; // reports.file_path points here
 
 /** The slice of a veradis-accounts `reports` row the bridge needs. */
@@ -161,7 +169,7 @@ export class VeradisAccountsClient {
         ...(init.headers as Record<string, string> | undefined),
       },
     });
-    if (!res.ok) throw new Error(`accounts ${init.method ?? "GET"} ${pathAndQuery} → ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream(`accounts ${init.method ?? "GET"} ${pathAndQuery} →`, res);
     const text = await res.text();
     if (!text) return [];
     const parsed = JSON.parse(text) as unknown;
@@ -274,7 +282,7 @@ export class VeradisAccountsClient {
       { headers: this.headers() },
     );
     if (res.status === 400 || res.status === 404) return null;
-    if (!res.ok) throw new Error(`accounts photo download ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream("accounts photo download", res);
     return new Uint8Array(await res.arrayBuffer());
   }
 
@@ -284,7 +292,7 @@ export class VeradisAccountsClient {
       `${this.url.replace(/\/$/, "")}/rest/v1/reports?id=eq.${encodeURIComponent(reportId)}&select=id,user_id,object_id,type,status`,
       { headers: this.headers() },
     );
-    if (!res.ok) throw new Error(`accounts report read ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream("accounts report read", res);
     const rows = (await res.json()) as AccountsReportRow[];
     return rows[0] ?? null;
   }
@@ -300,7 +308,7 @@ export class VeradisAccountsClient {
         body: html,
       },
     );
-    if (!res.ok) throw new Error(`accounts report upload ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream("accounts report upload", res);
     return path;
   }
 
@@ -314,7 +322,7 @@ export class VeradisAccountsClient {
         body: JSON.stringify(patch),
       },
     );
-    if (!res.ok) throw new Error(`accounts report update ${res.status} ${await res.text()}`);
+    if (!res.ok) await failUpstream("accounts report update", res);
   }
 }
 
