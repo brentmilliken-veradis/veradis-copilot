@@ -21,14 +21,28 @@ export const heicToJpeg: HeicConverter = async (bytes) => {
   return new Uint8Array(out);
 };
 
-function isHeic(photo: TallyPhotoRef, bytes: Uint8Array): boolean {
-  if (/hei[cf]/i.test(photo.mimeType) || /\.hei[cf]$/i.test(photo.name)) return true;
+function isHeic(name: string, mimeType: string, bytes: Uint8Array): boolean {
+  if (/hei[cf]/i.test(mimeType) || /\.hei[cf]$/i.test(name)) return true;
   // ISO-BMFF ftyp brand sniff: bytes 4-12 read "ftypheic"/"ftypheif"/"ftypmif1".
   if (bytes.length > 12) {
     const brand = Buffer.from(bytes.subarray(4, 12)).toString("ascii");
     if (/^ftyp(hei[cf]|mif1|msf1)/.test(brand)) return true;
   }
   return false;
+}
+
+/** Normalise one raw photo into a pipeline PhotoInput, converting HEIC → JPEG.
+ *  Shared by the Tally fetcher and the veradis-accounts intake (E-C). */
+export async function normalizePhoto(
+  name: string,
+  bytes: Uint8Array,
+  mimeType = "",
+  converter: HeicConverter = heicToJpeg,
+): Promise<PhotoInput> {
+  if (isHeic(name, mimeType, bytes)) {
+    return { filename: name.replace(/\.hei[cf]$/i, "") + ".jpg", bytes: await converter(bytes) };
+  }
+  return { filename: name, bytes };
 }
 
 /** Download every Tally photo, converting HEIC to JPEG. Preserves order so the
@@ -40,13 +54,8 @@ export async function fetchPhotos(
 ): Promise<PhotoInput[]> {
   const out: PhotoInput[] = [];
   for (const p of photos) {
-    let bytes = await fetcher(p.url);
-    let filename = p.name;
-    if (isHeic(p, bytes)) {
-      bytes = await converter(bytes);
-      filename = filename.replace(/\.hei[cf]$/i, "") + ".jpg";
-    }
-    out.push({ filename, bytes });
+    const bytes = await fetcher(p.url);
+    out.push(await normalizePhoto(p.name, bytes, p.mimeType, converter));
   }
   return out;
 }
