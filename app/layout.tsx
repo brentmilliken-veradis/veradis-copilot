@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -31,10 +32,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {/* Dark brand bar — Obsidian, matching the marketing site's dark nav. */}
         <header style={{ background: "#1A1714", padding: "14px 24px" }}>
-          <a href="/" style={{ display: "inline-flex", alignItems: "center" }}>
+          <Link href="/" style={{ display: "inline-flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/veradis-wordmark.svg" alt="veradis" height={32} style={{ height: 32, width: "auto" }} />
-          </a>
+          </Link>
         </header>
         {children}
       </body>

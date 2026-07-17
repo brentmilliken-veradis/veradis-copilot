@@ -14,7 +14,7 @@ import { pcgsAdapter, numistaAdapter } from "@/packages/adapters/source";
 import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
-import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
+import { getNarrativeAdapter } from "@/packages/adapters/narrative";
 import type { PipelineAdapters } from "@/packages/pipeline/run";
 
 export interface AppStore {
@@ -32,7 +32,7 @@ function buildAdapters(): PipelineAdapters {
     embedder: new StubEmbeddingAdapter(),
     graph: new StubGraphAdapter(),
     sanctions: new StubSanctionsAdapter(),
-    narrative: new StubNarrativeAdapter(),
+    narrative: getNarrativeAdapter(),
   };
 }
 
