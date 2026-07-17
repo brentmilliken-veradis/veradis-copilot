@@ -103,6 +103,67 @@ describe("F-2 — vision cannot raise the score", () => {
     expect(confirmed.snapshot.score.composite).toBe(echo.snapshot.score.composite);
   });
 
+  it("R-2: an uncorroborated vision attribute cannot lift the composite through CUSTODY", async () => {
+    // Attribute-keyed graph stub: a link exists only when the cross-ref sees
+    // `provenance_hint` (today's objectId-keyed stub is attribute-blind and
+    // could never catch this channel).
+    const attrGraph = {
+      name: "graph:attr-keyed",
+      crossRef: async (q: { attributes: Record<string, string> }) =>
+        q.attributes.provenance_hint
+          ? [{ institution: "Fake Museum", relation: "same-collection", confidence: 0.9 }]
+          : [],
+    };
+
+    // Baseline: no hint anywhere.
+    const baseline = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters(), graph: attrGraph },
+      coinOrder("c-cust-base", DECLARED),
+    );
+
+    // Attack: vision ADDS provenance_hint (uncorroborated) — must not lift.
+    const visionAdds = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters({ "c-cust-vis": { derivedAttributes: { provenance_hint: "ex-Royal Collection" } } }), graph: attrGraph },
+      coinOrder("c-cust-vis", DECLARED),
+    );
+    expect(visionAdds.snapshot.score.composite).toBeLessThanOrEqual(baseline.snapshot.score.composite);
+    expect(visionAdds.snapshot.checks.filter((c) => c.quadrant === "custody")).toHaveLength(0); // no link earned
+
+    // Positive control: the OWNER declares the hint → the channel works and lifts.
+    const ownerDeclares = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters(), graph: attrGraph },
+      coinOrder("c-cust-decl", { ...DECLARED, provenance_hint: "ex-Royal Collection" }),
+    );
+    expect(ownerDeclares.snapshot.score.composite).toBeGreaterThan(baseline.snapshot.score.composite);
+    expect(ownerDeclares.snapshot.checks.some((c) => c.quadrant === "custody")).toBe(true);
+  });
+
+  it("R-2: a Tier-1-corroborated vision correction still reaches custody", async () => {
+    const attrGraph = {
+      name: "graph:attr-keyed",
+      crossRef: async (q: { attributes: Record<string, string> }) =>
+        q.attributes.year === "2007" ? [{ institution: "Royal Canadian Mint", relation: "same-issue", confidence: 0.8 }] : [],
+    };
+    const res = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      {
+        ...adapters({ "c-cust-corr": { derivedAttributes: { year: "2007" } } }),
+        sources: [pcgsAdapter({ "year=2007": { matched: true } }), numistaAdapter()],
+        graph: attrGraph,
+      },
+      coinOrder("c-cust-corr", { ...DECLARED, year: "2008" }), // owner mislabelled
+    );
+    // The corrected + Tier-1-resolved year flows to the graph → custody link.
+    expect(res.snapshot.checks.some((c) => c.quadrant === "custody")).toBe(true);
+  });
+
   it("a vision-only category re-route seals capped and cannot be confirmed", async () => {
     const repo = new InMemoryRepository();
     const res = await runProvisional(

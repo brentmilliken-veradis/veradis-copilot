@@ -78,6 +78,18 @@ export async function enrich(
 
   // ── Identity ────────────────────────────────────────────────────────────
   const normv = (v: string): string => v.trim().toLowerCase();
+
+  // R-2 (fix brief v04): only CORROBORATED values may feed custody. Base set =
+  // the owner's unchanged declarations; identity keys that earn Tier-1/corpus
+  // credit are added in the loop below. A value that exists only because
+  // vision changed or added it never reaches the graph cross-ref — F-2 closed
+  // the identity channel, this closes the custody proxy.
+  const corroboratedAttributes: Record<string, string> = {};
+  for (const [k, v] of Object.entries(resolvedAttributes)) {
+    const declaredVal = declaredAttributes[k];
+    if (declaredVal !== undefined && normv(declaredVal) === normv(v)) corroboratedAttributes[k] = v;
+  }
+
   const identity: IdentityCheckInput[] = [];
   for (const idKey of profile.identityKeys) {
     const value = resolvedAttributes[idKey.key];
@@ -106,6 +118,7 @@ export async function enrich(
         present = true;
         result = correctedKeys.has(idKey.key) ? "corrected" : "match";
         citation = { name: resolved.name, url: resolved.url, retrievalState: "retrieved", tier: 1 };
+        corroboratedAttributes[idKey.key] = value; // Tier-1 closed it (R-2)
       } else {
         // Corpus corroboration (Tier 2–3) — cite, never close.
         const top = await retrieveTopK(repo, adapters.embedder, {
@@ -120,6 +133,7 @@ export async function enrich(
           result = correctedKeys.has(idKey.key) ? "corrected" : "consistent";
           const src = String(top[0].chunk.metadataJson.source ?? "corpus");
           citation = { name: src, retrievalState: "retrieved", tier: 2 };
+          corroboratedAttributes[idKey.key] = value; // corpus corroborated (R-2)
         } else {
           // F-2 (D-2): vision may only downgrade. With neither Tier-1 nor
           // corpus corroboration, a value that exists only because vision
@@ -203,10 +217,13 @@ export async function enrich(
   }
 
   // ── Custody (graph cross-ref raises coverage) ────────────────────────────
+  // R-2: the cross-ref sees ONLY corroborated attributes — an uncorroborated
+  // vision value can never lift coverage/eventCount (and so the composite)
+  // through custody. resolvedAttributes stays as-is for display.
   const links = await adapters.graph.crossRef({
     objectId: report.objectId,
     category: report.category,
-    attributes: resolvedAttributes,
+    attributes: corroboratedAttributes,
   });
   const baseCoverage = input.custodyHint?.coverage ?? 0.5;
   const coverage = Math.min(1, baseCoverage + links.reduce((a, l) => a + l.confidence * 0.1, 0));
