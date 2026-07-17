@@ -55,8 +55,11 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
 
   // F-8: validate the expert-set indicative band (Appraise only, sane values)
   // and pre-compute the sealed valuation. Runs before addCuratorAction (R-6).
+  // A withheld report never seals a band, so a stray band on a withhold is
+  // ignored, not validated (Cleanup 1) — the admin form leaving a band field
+  // populated must not block a withhold.
   let valuation = prevSnap.valuation;
-  if (input.valuationBand) {
+  if (input.valuationBand && input.verb !== "withheld") {
     const { currency, lo, hi } = input.valuationBand;
     if (!valuation) throw new Error("valuationBand supplied for a report with no Appraise valuation section");
     if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo < 0 || hi < lo || (lo === 0 && hi === 0)) {
