@@ -1,26 +1,32 @@
 # ADR-002 · Wire the live verify.veradis.ai flow to the CoPilot PCS engine (+ multi-category)
-**Status:** Proposed (for CTO ratification) · **Date:** 2026-07-17 · builds on ADR-001 (agentic pipeline) + PHASE-A-STATUS.
+**Status:** Proposed (for CTO ratification) · **Date:** 2026-07-17 · **Revised 2026-07-17 → PULL/queue contract** after coordinating with the account-template session. Builds on ADR-001 + PHASE-A-STATUS.
 
 ## Context
-Phase A (coins) is green in `veradis-copilot`: deterministic scorer (Method v21, NumPy-parity to the digit), 14-section report renderer, curator confirm→definitive, corpus/RAG, `runProvisional` orchestrator. But: its intake is a **Tally webhook**; it runs on **stubbed adapters + InMemoryRepository** (the dedicated copilot Supabase is unprovisioned); and the **live consumer flow** (verify.veradis.ai store + veradis-accounts) delivers reports **by hand** via `/admin`. Goal: a real paid order auto-produces a report via the engine, stored on the object in the collector's account, across the categories Brent collects — wired **before any paying customer**. Today that's protected by Stripe **TEST mode**; real customers are gated on the SARL live-flip, so the runway exists.
+Phase A (coins) is green in `veradis-copilot` (deterministic scorer, report renderer, curator flow, `runProvisional`). Two sessions share one seam:
+- **Account-template session** owns verify-store's account app + `api/create-checkout-session|stripe-webhook|reverify|admin-enrich`, pricing/checkout/currency, and the **veradis-accounts** schema. It built a **job-queue contract**: paid orders, Enrich upgrades and free re-verify seed `reports` rows and `enrichment_jobs`; the account page reads the living-layer tables live (RLS, user reads own rows).
+- **This (copilot) session** owns the PCS engine + the copilot Supabase (`lpfmaaeuojextcqhsivs`).
+The engine integrates by **writing to the shared veradis-accounts tables via the service role (RLS bypass) — that is the whole contract.** No cross-service push; no edits to the account-template's files.
 
-## Decision
-1. **Intake adapter (new).** verify.veradis.ai paid `report` order (Stripe webhook + the object's photos/fields from veradis-accounts storage) → copilot `intake` → `runProvisional`. Sits parallel to `app/api/intake/tally/route.ts`; reuses the same category-agnostic intake.
-2. **Delivery bridge (new).** copilot **provisional** (auto) + **curator-confirmed definitive** report → written onto the veradis-accounts `reports` row on the object (file + score + status), replacing manual `admin-deliver`. Two Supabase projects; one-way bridge via service role.
-3. **Categories are data-driven** (`profiles/data/<cat>.vN.json` via `loader.ts`). Today: **coins** (full), **medals** (minimal). Add **watches, art, fine-china, medals(full)** — each = profile JSON + Tier-1 sources + calibration.
-4. **Gates unchanged.** ADR-001 critic/QA agent (may only withhold/downgrade) gates the provisional; the curator (Brent) confirms the definitive.
+## Decision (revised — PULL, not push)
+1. **Trigger = poll the shared queues on veradis-accounts** (via the accounts service-role client):
+   - `reports` where `status='in_production'` → run the PCS pipeline → write back to that row (`pcs_score`, `valuation`, `file_path` in `report-files`, `status='delivered'`).
+   - `enrichment_jobs` where `status='queued'` → produce findings → write the living-layer tables → mark the job `done`.
+   The earlier push design (`/api/intake/veradis` + a verify-store webhook POST) is **RETIRED** — the account-template webhook does not push, and it is not ours to edit.
+2. **Delivery (unchanged).** Write back to the `reports` row. Already matches; `file_path`/`pcs_score`/`status`/`valuation` confirmed on the live veradis-accounts schema (2026-07-17).
+3. **Living-layer writer (NEW).** Mirror `api/admin-enrich.js` (service role, per-op inserts, `complete_jobs`): write `enrichment_events`, `object_links`, `threads`, `collection_valuation`, and the `objects` enrich columns (`narrative_html`, `narrative_sources`, `timeline_date`, `enriched_state`), driven off `enrichment_jobs.kind` (first_pass|reverify|relink|revalue|narrative).
+4. **Categories + gates unchanged.** Honesty rule holds (new categories provisional/flagged). Living-layer + re-verify are entitlement-gated server-side by the account-template.
 
-## Prerequisites — LIVE blockers (human/CTO; the build agent cannot do these)
-- Provision the dedicated **copilot Supabase** + apply `0001` schema (never operating-prod `tchfcyvclcjchoodgdnx`). Cost decision.
-- Enter the **six API keys** (Vision · PCGS · Numista · Embeddings · Sanctions · Narrative) into env — never in the repo. Credentials are entered by a human, not the agent.
-- Deploy copilot (Vercel + git remote) — needs explicit go-ahead.
-Until these land, the engine runs on stubs (canned data): good for wiring + tests, not for a real score.
+## Lanes (do not cross)
+- copilot engine + copilot Supabase = this session.
+- verify-store account app + `api/*` + pricing/checkout + veradis-accounts schema = account-template session.
+- **Shared:** the veradis-accounts DB tables (engine WRITES / page READS) + `reports`. Pricing SSOT `20260717_PRD_LEDGER_Pricing-SSOT_v01.md` — read before touching money.
+- **Never edit** `verify-store/index.html` (clobber risk) or any account-template `api/*` file.
 
-## Honesty rule for new categories (non-negotiable)
-A category ships to a **paying customer** only after its **real Tier-1 sources + calibration + a Dealer-Grade-style review** — the depth coins got. Before that it runs **provisional · thin-sources · flagged**: fine for **Brent's own collection testing**, never for a customer. A confident-wrong score is the one failure that kills the brand (ADR-001).
+## Prerequisites — LIVE (human/CTO)
+- Deploy copilot to Vercel (pollers run as cron routes) + env: copilot Supabase creds (done), `ANTHROPIC_API_KEY`, `VERADIS_ACCOUNTS_URL` + its service_role (read photos/queues + write the shared tables), `CRON_SECRET`. No intake signing secret (push retired).
+- Flip `DATA_BACKEND` to the copilot Supabase repository. Stripe stays TEST until the SARL/live flip.
 
 ## Sequencing
-- **P0 — now, no keys:** build the intake adapter + delivery bridge against stubs/InMemory; scaffold `watches/art/fine-china/medals-full` profiles so objects flow end-to-end; write tests.
-- **P1 — CTO provisions:** keys + copilot Supabase → **coins & medals live** end-to-end through the real store.
-- **P2 — per category:** Vision + Narrative keys first (so real photos read + prose drafts), then Tier-1 sources + calibration + review, category by category (watches → art → china …).
-- **Gate:** all of it before the SARL / Stripe-live flip. No real customer exposed.
+- Done: engine built (E-A..E-F), copilot Supabase provisioned + 0001/0002 applied, Narrative live.
+- **Reconciliation pass (v02 brief):** retire push; add report poller + living-layer writer; deploy as crons.
+- P2 per category: real Tier-1 sources + calibration + review.
