@@ -5,6 +5,7 @@
 // Bearer token). Without the accounts env the tick is a no-op, not an error.
 
 import { getStore } from "@/app/lib/store";
+import { checkCronAuth } from "@/app/lib/cron-auth";
 import { getAccountsClient } from "@/packages/adapters/accounts";
 import { pollReports } from "@/packages/pollers/reports";
 
@@ -12,13 +13,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return Response.json({ error: "unauthorized" }, { status: 401 });
-    }
-  }
+  const denied = checkCronAuth(request); // F-3: fails closed without CRON_SECRET
+  if (denied) return denied;
 
   const accounts = getAccountsClient();
   if (!accounts) {
