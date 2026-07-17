@@ -106,7 +106,7 @@ export async function processAccountsReport(
   // (covers a crash between produce and write-back).
   const existingOrder = await deps.repo.getOrder(row.id);
   if (existingOrder) {
-    const copilotReport = (await deps.repo.listReports()).find((r) => r.orderId === row.id);
+    const copilotReport = await deps.repo.getReportByOrderId(row.id); // F-6: bounded lookup
     const version = copilotReport ? await deps.repo.getLatestVersion(copilotReport.id) : null;
     if (!copilotReport || !version) {
       return { reportId: row.id, outcome: "failed", reason: "order exists but no copilot report/version" };

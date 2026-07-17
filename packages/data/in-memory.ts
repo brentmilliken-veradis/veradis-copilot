@@ -101,6 +101,13 @@ export class InMemoryRepository implements Repository {
     return r ? { ...r } : null;
   }
 
+  async getReportByOrderId(orderId: string): Promise<Report | null> {
+    for (const r of this.reports.values()) {
+      if (r.orderId === orderId) return { ...r };
+    }
+    return null;
+  }
+
   async updateReport(
     id: string,
     patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,

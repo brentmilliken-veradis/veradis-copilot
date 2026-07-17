@@ -94,6 +94,16 @@ describe("SupabaseRepository", () => {
     expect(await repo().getReport("nope")).toBeNull();
   });
 
+  it("getReportByOrderId is a bounded single-row query (F-6)", async () => {
+    const { calls } = mockRest(() => [reportRow]);
+    const hit = await repo().getReportByOrderId("acc-rep-1");
+    expect(calls[0].url).toBe(`${URL_BASE}/rest/v1/report?order_id=eq.acc-rep-1&order=created_at.desc&limit=1`);
+    expect(hit?.orderId).toBe("acc-rep-1");
+    vi.unstubAllGlobals();
+    mockRest(() => []);
+    expect(await repo().getReportByOrderId("missing")).toBeNull();
+  });
+
   it("upsertProfile uses on_conflict merge-duplicates and the jsonb column", async () => {
     const { calls } = mockRest(() => [
       { id: "p-1", category: "art", version: 1, jsonb: { category: "art", version: 1 } },

@@ -232,6 +232,13 @@ export class SupabaseRepository implements Repository {
     return rows.length ? mapReport(rows[0]) : null;
   }
 
+  async getReportByOrderId(orderId: string): Promise<Report | null> {
+    const rows = await this.rest(
+      `report?order_id=eq.${encodeURIComponent(orderId)}&order=created_at.desc&limit=1`,
+    );
+    return rows.length ? mapReport(rows[0]) : null;
+  }
+
   async updateReport(
     id: string,
     patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,

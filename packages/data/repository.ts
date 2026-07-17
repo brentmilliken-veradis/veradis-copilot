@@ -40,6 +40,9 @@ export interface Repository {
   // reports
   createReport(input: NewReport): Promise<Report>;
   getReport(id: string): Promise<Report | null>;
+  /** Bounded lookup by order id (F-6) — the poller's delivery-retry path must
+   *  not scan the table (PostgREST silently caps list responses at 1000). */
+  getReportByOrderId(orderId: string): Promise<Report | null>;
   updateReport(
     id: string,
     patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,
