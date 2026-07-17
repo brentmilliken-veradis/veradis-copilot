@@ -118,7 +118,7 @@ describe.runIf(process.env.E2E === "1")("LIVE end-to-end", () => {
     // ── STAGE 2 · ingest + mislabel correction (BEFORE scoring) ──
     const ing = await stage("2 ingest+correct", () => ingest(repo, vision, {
       report: intake.report, profile: intake.profile, declaredAttributes: order.declaredAttributes,
-      evidence: intake.evidence.map((e) => ({ id: e.id, slot: e.slot, sha256: e.sha256 })),
+      evidence: intake.evidence.map((e) => ({ id: e.id, slot: e.slot, sha256: e.sha256, storagePath: e.storagePath })),
     }));
     log(`[2] INGEST  → C2PA checked; corrections=${ing.corrections.length}`);
     for (const c of ing.corrections) log(`    ⤷ CORRECTION FIRED: “${c.claimed}” → “${c.correctedValue}”  (${c.kindnessNote})`);

@@ -19,7 +19,7 @@ export interface IngestInput {
   report: Report;
   profile: CategoryProfile;
   declaredAttributes: Record<string, string>;
-  evidence: { id: string; slot: string; sha256: string }[];
+  evidence: { id: string; slot: string; sha256: string; storagePath: string }[];
 }
 
 export interface IngestResult {
@@ -51,7 +51,7 @@ export async function ingest(
     objectId: report.objectId,
     category: report.category,
     declaredAttributes,
-    evidence: input.evidence.map((e) => ({ slot: e.slot, sha256: e.sha256 })),
+    evidence: input.evidence.map((e) => ({ slot: e.slot, sha256: e.sha256, storagePath: e.storagePath })),
   });
 
   // Gate ④ — write each image's C2PA state. An invalid credential is a red flag.

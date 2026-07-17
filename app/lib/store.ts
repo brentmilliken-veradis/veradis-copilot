@@ -25,9 +25,10 @@ export interface AppStore {
   seededReportId: string;
 }
 
-function buildAdapters(): PipelineAdapters {
+function buildAdapters(storage: Storage): PipelineAdapters {
   return {
-    vision: getVisionAdapter(),
+    // Live vision needs the storage to load image bytes for Claude image blocks.
+    vision: getVisionAdapter({}, storage),
     sources: [pcgsAdapter(), numistaAdapter()],
     embedder: new StubEmbeddingAdapter(),
     graph: new StubGraphAdapter(),
@@ -53,7 +54,8 @@ async function seed(): Promise<AppStore> {
     ciHi: snap.score.ci.hi,
     pdfPath: null,
   });
-  return { repo, storage: new StubStorage(), emailer: getEmailer(), adapters: buildAdapters(), seededReportId: report.id };
+  const storage = new StubStorage();
+  return { repo, storage, emailer: getEmailer(), adapters: buildAdapters(storage), seededReportId: report.id };
 }
 
 const g = globalThis as unknown as { __veradisStore?: Promise<AppStore> };

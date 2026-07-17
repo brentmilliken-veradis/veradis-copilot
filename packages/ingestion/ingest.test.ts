@@ -33,7 +33,7 @@ async function runIntakeThenIngest(order: OrderIntake, scenarios: Record<string,
     report: intake.report,
     profile: intake.profile,
     declaredAttributes: order.declaredAttributes,
-    evidence: intake.evidence.map((e) => ({ id: e.id, slot: e.slot, sha256: e.sha256 })),
+    evidence: intake.evidence.map((e) => ({ id: e.id, slot: e.slot, sha256: e.sha256, storagePath: e.storagePath })),
   });
   return { repo, intake, result };
 }

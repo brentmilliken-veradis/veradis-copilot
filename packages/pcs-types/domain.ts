@@ -4,9 +4,13 @@
 // SQL migration uses snake_case columns and the (deferred) Supabase
 // repository maps between them.
 
-/** The five MVP category profiles. Phase A ships Coins; the rest are declared
+/** The MVP category profiles. Phase A ships Coins; the rest are declared
  *  so the engine stays category-agnostic. */
 export type Category = "coins" | "cards" | "medals" | "watches" | "silver";
+
+/** Runtime list of every category — for validating untrusted category strings
+ *  (webhook payloads, vision output) against the union. Keep in sync. */
+export const ALL_CATEGORIES: readonly Category[] = ["coins", "cards", "medals", "watches", "silver"];
 
 /** The four PCS quadrants (Method v21 §2). Weights 30/30/25/15. */
 export type Quadrant = "identity" | "custody" | "material" | "risk";
