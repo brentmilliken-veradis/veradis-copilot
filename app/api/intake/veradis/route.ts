@@ -19,6 +19,7 @@ import {
 import type { PhotoInput } from "@/packages/intake/types";
 import { normalizePhoto } from "@/packages/adapters/photos";
 import { getAccountsClient } from "@/packages/adapters/accounts";
+import { deliverReport } from "@/packages/delivery/bridge";
 import { runProvisional } from "@/packages/pipeline/run";
 import { sendCuratorReview } from "@/packages/notify/emails";
 import { markStubbed } from "@/packages/adapters/stub-registry";
@@ -90,6 +91,13 @@ export async function POST(request: Request) {
       if (!photos.length) throw new Error("no photos could be downloaded from veradis-accounts");
 
       const result = await runProvisional(repo, storage, adapters, toOrderIntake(parsed, photos));
+
+      // E-D — the provisional lands on the collector's object automatically.
+      const delivery = await deliverReport(accounts, result.report, result.version);
+      if (!delivery.delivered) {
+        console.warn(`veradis intake ${order.id}: provisional not delivered — ${delivery.reason}`);
+      }
+
       if (result.report.status === "provisional") {
         await sendCuratorReview(repo, emailer, order, result.report.id, result.score.tier); // EMAIL B
       }

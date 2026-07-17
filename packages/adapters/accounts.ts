@@ -7,6 +7,15 @@
 const OBJECT_PHOTOS_BUCKET = "object-photos"; // objects.photo_paths point here
 const REPORT_FILES_BUCKET = "report-files"; // reports.file_path points here
 
+/** The slice of a veradis-accounts `reports` row the bridge needs. */
+export interface AccountsReportRow {
+  id: string;
+  user_id: string;
+  object_id: string;
+  type: string;
+  status: string;
+}
+
 /** Patch applied to a veradis-accounts `reports` row on delivery. */
 export interface AccountsReportPatch {
   status: "delivered";
@@ -39,6 +48,17 @@ export class VeradisAccountsClient {
     if (res.status === 400 || res.status === 404) return null;
     if (!res.ok) throw new Error(`accounts photo download ${res.status} ${await res.text()}`);
     return new Uint8Array(await res.arrayBuffer());
+  }
+
+  /** Read the `reports` row the bridge is about to write (path needs user_id). */
+  async getReport(reportId: string): Promise<AccountsReportRow | null> {
+    const res = await fetch(
+      `${this.url.replace(/\/$/, "")}/rest/v1/reports?id=eq.${encodeURIComponent(reportId)}&select=id,user_id,object_id,type,status`,
+      { headers: this.headers() },
+    );
+    if (!res.ok) throw new Error(`accounts report read ${res.status} ${await res.text()}`);
+    const rows = (await res.json()) as AccountsReportRow[];
+    return rows[0] ?? null;
   }
 
   /** Store a rendered report file; returns the `reports.file_path` value. */
