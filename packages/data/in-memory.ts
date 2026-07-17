@@ -92,6 +92,26 @@ export class InMemoryRepository implements Repository {
     return { ...o };
   }
 
+  async reclaimStaleOrder(
+    orderId: string,
+    expected: { claimedAt: string | null; attempts: number },
+    newClaimedAt: string,
+  ): Promise<Order | null> {
+    // Synchronous check-and-set — atomic w.r.t. async interleavings (R-3).
+    const o = this.orders.get(orderId);
+    if (
+      !o ||
+      o.productionState !== "producing" ||
+      o.claimedAt !== expected.claimedAt ||
+      o.attempts !== expected.attempts
+    ) {
+      return null;
+    }
+    o.claimedAt = newClaimedAt;
+    o.attempts = expected.attempts + 1;
+    return { ...o };
+  }
+
   async getOrderByTallySubmission(submissionId: string): Promise<Order | null> {
     for (const o of this.orders.values()) {
       if (o.tallySubmissionId === submissionId) return o;

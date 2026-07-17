@@ -511,6 +511,27 @@ export class SupabaseRepository implements Repository {
     return rows.length ? mapOrder(rows[0]) : null;
   }
 
+  async reclaimStaleOrder(
+    orderId: string,
+    expected: { claimedAt: string | null; attempts: number },
+    newClaimedAt: string,
+  ): Promise<Order | null> {
+    // R-3: conditional PATCH — the WHERE carries the expected claim state, so
+    // exactly one concurrent tick gets a row back (compare-and-swap).
+    const claimedFilter =
+      expected.claimedAt === null
+        ? "claimed_at=is.null"
+        : `claimed_at=eq.${encodeURIComponent(expected.claimedAt)}`;
+    const rows = await this.rest(
+      `orders?id=eq.${encodeURIComponent(orderId)}&${claimedFilter}&attempts=eq.${expected.attempts}&production_state=eq.producing`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ claimed_at: newClaimedAt, attempts: expected.attempts + 1 }),
+      },
+    );
+    return rows.length ? mapOrder(rows[0]) : null;
+  }
+
   async getOrderByTallySubmission(submissionId: string): Promise<Order | null> {
     const rows = await this.rest(`orders?tally_submission_id=eq.${encodeURIComponent(submissionId)}`);
     return rows.length ? mapOrder(rows[0]) : null;

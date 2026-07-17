@@ -157,6 +157,26 @@ describe("SupabaseRepository", () => {
     expect(err!.message).not.toContain("SECRET-UPSTREAM-DETAIL");
   });
 
+  it("reclaimStaleOrder is a conditional PATCH carrying the expected claim state (R-3)", async () => {
+    const { calls } = mockRest(() => [
+      {
+        id: "acc-rep-1", tally_submission_id: "veradis:acc-rep-1", email: "c@x.com", owner_name: null,
+        category: "coins", sku: "verify", created_at: "2026-07-17T00:00:00Z",
+        production_state: "producing", attempts: 2, claimed_at: "2026-07-17T12:20:00Z", last_error: null,
+      },
+    ]);
+    const won = await repo().reclaimStaleOrder("acc-rep-1", { claimedAt: "2026-07-17T12:00:00Z", attempts: 1 }, "2026-07-17T12:20:00Z");
+    expect(calls[0].url).toBe(
+      `${URL_BASE}/rest/v1/orders?id=eq.acc-rep-1&claimed_at=eq.2026-07-17T12%3A00%3A00Z&attempts=eq.1&production_state=eq.producing`,
+    );
+    expect(JSON.parse(calls[0].init?.body as string)).toEqual({ claimed_at: "2026-07-17T12:20:00Z", attempts: 2 });
+    expect(won?.attempts).toBe(2);
+
+    vi.unstubAllGlobals();
+    mockRest(() => []); // another tick already took it
+    expect(await repo().reclaimStaleOrder("acc-rep-1", { claimedAt: null, attempts: 1 }, "t")).toBeNull();
+  });
+
   it("createOrder maps a 409 unique violation to DuplicateOrderError (F-5a)", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"code":"23505"}', { status: 409 })));
     await expect(

@@ -96,6 +96,15 @@ export interface Repository {
     orderId: string,
     patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
   ): Promise<Order>;
+  /** R-3: compare-and-swap reclaim of a stale 'producing' claim. Takes the row
+   *  ONLY when productionState is still 'producing' AND (claimedAt, attempts)
+   *  match the observed values — bumping attempts and stamping the new claim.
+   *  Returns the reclaimed order, or null when another tick won the race. */
+  reclaimStaleOrder(
+    orderId: string,
+    expected: { claimedAt: string | null; attempts: number },
+    newClaimedAt: string,
+  ): Promise<Order | null>;
 
   // outbound email log (EMAIL A/B/C audit trail)
   recordEmail(input: NewEmailRecord): Promise<EmailRecord>;

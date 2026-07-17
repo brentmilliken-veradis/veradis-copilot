@@ -173,8 +173,15 @@ export async function processAccountsReport(
           });
           return { reportId: row.id, outcome: "failed", reason: "max production attempts exhausted" };
         }
-        // Crash recovery: reclaim the stale row and try again.
-        await deps.repo.updateOrder(row.id, { claimedAt: now().toISOString(), attempts: existingOrder.attempts + 1 });
+        // Crash recovery: reclaim the stale row via compare-and-swap (R-3) —
+        // exactly one concurrent tick wins; the loser skips without a second
+        // paid pipeline run.
+        const won = await deps.repo.reclaimStaleOrder(
+          row.id,
+          { claimedAt: existingOrder.claimedAt, attempts: existingOrder.attempts },
+          now().toISOString(),
+        );
+        if (!won) return { reportId: row.id, outcome: "skipped", reason: "claimed by another tick" };
         reclaimed = true;
         break;
       }

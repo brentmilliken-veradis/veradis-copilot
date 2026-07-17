@@ -293,6 +293,40 @@ describe("pollReports", () => {
     expect(fourth.results[0].reason).toMatch(/failed previously/);
   });
 
+  it("R-3: two concurrent ticks over the same STALE claim — exactly one re-runs production", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    const t0 = Date.parse("2026-07-17T12:00:00Z");
+
+    // A crashed tick left a stale 'producing' claim, no report produced.
+    await d.repo.createOrder({
+      id: "rep-1",
+      tallySubmissionId: "veradis:rep-1",
+      email: "collector@example.com",
+      ownerName: "Alex Collector",
+      category: "art",
+      sku: "verify",
+      productionState: "producing",
+      attempts: 1,
+      claimedAt: new Date(t0).toISOString(),
+    });
+
+    d.now = () => new Date(t0 + 20 * 60 * 1000); // past the staleness window
+    const row = accounts.queue[0];
+    const [r1, r2] = await Promise.all([
+      processAccountsReport(d, { ...row }),
+      processAccountsReport(d, { ...row }),
+    ]);
+
+    expect([r1.outcome, r2.outcome].sort()).toEqual(["delivered", "skipped"]);
+    expect([r1, r2].find((r) => r.outcome === "skipped")?.reason).toBe("claimed by another tick");
+    // One pipeline run, one upload, one write-back — no double paid run.
+    expect((await d.repo.listReports()).filter((r) => r.orderId === "rep-1")).toHaveLength(1);
+    expect(accounts.uploads).toHaveLength(1);
+    expect((await d.repo.getOrder("rep-1"))?.attempts).toBe(2);
+  });
+
   it("F-4: a report row pointing at another tenant's object is never produced or delivered", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);
