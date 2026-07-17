@@ -1,0 +1,35 @@
+{
+  "category": "fine-china",
+  "version": 1,
+  "label": "Fine china & porcelain (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "identityKeys": [
+    { "key": "manufactory", "label": "Manufactory / maker", "weight": 0.3 },
+    { "key": "backstamp_mark", "label": "Backstamp / mark", "weight": 0.3 },
+    { "key": "pattern_or_form", "label": "Pattern / form", "weight": 0.2 },
+    { "key": "date_range", "label": "Date range", "weight": 0.1 },
+    { "key": "decorator_signature", "label": "Decorator / painter mark", "weight": 0.1 }
+  ],
+  "identityNeverKeys": ["serial"],
+  "captureSlots": [
+    { "slotId": "front_full", "label": "Front (full)", "guidance": "Whole piece, square-on, even light.", "requiredFor": "identity", "core": true },
+    { "slotId": "backstamp_macro", "label": "Backstamp macro", "guidance": "Macro of the backstamp / factory mark on the base.", "requiredFor": "identity", "core": true, "unlocks": ["mark_dating"] },
+    { "slotId": "base_footrim", "label": "Base and foot rim", "guidance": "Full base: foot rim wear, paste colour, incised or impressed marks.", "requiredFor": "material", "core": true },
+    { "slotId": "rim_detail", "label": "Rim / gilding detail", "guidance": "Rim and gilding under raking light — wear, restoration, overpaint.", "requiredFor": "material", "core": false },
+    { "slotId": "set_layout", "label": "Set layout", "guidance": "Full service laid out, if a set.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "spurious_mark", "label": "Spurious mark", "description": "Later or counterfeit backstamp imitating a premium manufactory." },
+    { "key": "later_decoration", "label": "Later decoration", "description": "Genuine blank decorated later outside the factory and sold as factory-decorated." },
+    { "key": "restoration_overpaint", "label": "Concealed restoration", "description": "Overpainted rim chips, sprayed glaze, or rebuilt elements." },
+    { "key": "pattern_mismatch", "label": "Pattern / mark mismatch", "description": "Pattern or form inconsistent with the period the mark claims." },
+    { "key": "reproduction_body", "label": "Reproduction body", "description": "Modern paste and glaze inconsistent with the claimed manufactory and period." }
+  ],
+  "corpusSources": [
+    { "name": "Manufactory archives and pattern books (Meissen, KPM, Royal Copenhagen)", "tier": 1, "role": "ground_truth" },
+    { "name": "Marks references (Miller's, Kovels)", "tier": 2, "role": "corroboration" },
+    { "name": "Auction archives (Bonhams, Christie's decorative arts)", "tier": 2, "role": "corroboration" },
+    { "name": "Collector forums and mark-identification boards", "tier": 4, "role": "cite_only" }
+  ],
+  "compKeys": ["manufactory", "pattern_or_form", "date_range", "condition", "set_completeness"],
+  "materialSlotClass": "paste_glaze_mark"
+}

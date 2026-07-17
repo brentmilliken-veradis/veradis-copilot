@@ -41,6 +41,35 @@ describe("profile loader", () => {
     expect(() => validateProfile(bad)).toThrow(/forbidden identity key/);
   });
 
+  it("loads the E-E scaffold profiles (watches, art, fine-china) validated", () => {
+    for (const cat of ["watches", "art", "fine-china"] as const) {
+      const p = loadProfile(cat);
+      expect(p.category).toBe(cat);
+      expect(p.version).toBe(1);
+      const sum = p.identityKeys.reduce((a, k) => a + k.weight, 0);
+      expect(sum).toBeCloseTo(1.0, 6);
+      expect(p.captureSlots.some((s) => s.core)).toBe(true);
+      expect(p.redFlags.length).toBeGreaterThan(0);
+      // Scaffolds are explicitly labelled so no artefact presents them as calibrated.
+      expect(p.label.toLowerCase()).toMatch(/scaffold|thin/);
+    }
+  });
+
+  it("medals resolves to the full v2 profile; v1 stays pinnable", () => {
+    const latest = loadProfile("medals");
+    expect(latest.version).toBe(2);
+    expect(latest.captureSlots.map((s) => s.slotId)).toContain("naming_macro");
+    expect(latest.redFlags.map((r) => r.key)).toContain("remounted_group");
+    const pinned = loadProfile("medals", 1);
+    expect(pinned.version).toBe(1);
+  });
+
+  it("watches legitimately use a serial (not a forbidden key)", () => {
+    const p = loadProfile("watches");
+    expect(p.identityKeys.some((k) => k.key === "serial_number")).toBe(true);
+    expect(p.identityNeverKeys ?? []).not.toContain("serial_number");
+  });
+
   it("throws for an unknown category", () => {
     // @ts-expect-error — exercising the runtime guard
     expect(() => loadProfile("furniture")).toThrow(ProfileValidationError);

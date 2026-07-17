@@ -4,13 +4,22 @@
 // SQL migration uses snake_case columns and the (deferred) Supabase
 // repository maps between them.
 
-/** The MVP category profiles. Phase A ships Coins; the rest are declared
- *  so the engine stays category-agnostic. */
-export type Category = "coins" | "cards" | "medals" | "watches" | "silver";
+/** The category profiles. Phase A shipped Coins (full); ADR-002 adds art,
+ *  fine-china and full watches/medals as thin-source SCAFFOLDS — they run
+ *  provisional/flagged until real Tier-1 sources + calibration land (P2). */
+export type Category = "coins" | "cards" | "medals" | "watches" | "silver" | "art" | "fine-china";
 
 /** Runtime list of every category — for validating untrusted category strings
  *  (webhook payloads, vision output) against the union. Keep in sync. */
-export const ALL_CATEGORIES: readonly Category[] = ["coins", "cards", "medals", "watches", "silver"];
+export const ALL_CATEGORIES: readonly Category[] = [
+  "coins",
+  "cards",
+  "medals",
+  "watches",
+  "silver",
+  "art",
+  "fine-china",
+];
 
 /** The four PCS quadrants (Method v21 §2). Weights 30/30/25/15. */
 export type Quadrant = "identity" | "custody" | "material" | "risk";
