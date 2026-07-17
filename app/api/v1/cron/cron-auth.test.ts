@@ -4,10 +4,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as reportsGET } from "./reports/route";
 import { GET as enrichGET } from "./enrich/route";
+import { GET as corpusGET } from "./corpus/route";
 
-const ROUTES: [string, (req: Request) => Promise<Response>][] = [
+// The two accounts-backed pollers short-circuit to a stubbed 200 without the
+// accounts env — usable in the "valid bearer" case. Corpus does real in-memory
+// work on the valid path, so it only joins the fail-closed (deny) cases.
+const ACCOUNTS_ROUTES: [string, (req: Request) => Promise<Response>][] = [
   ["reports", reportsGET],
   ["enrich", enrichGET],
+];
+const ALL_ROUTES: [string, (req: Request) => Promise<Response>][] = [
+  ...ACCOUNTS_ROUTES,
+  ["corpus", corpusGET],
 ];
 
 const OLD = {
@@ -41,7 +49,7 @@ describe("F-3 — cron auth fails closed", () => {
     }
   });
 
-  for (const [name, GET] of ROUTES) {
+  for (const [name, GET] of ALL_ROUTES) {
     it(`${name}: no CRON_SECRET → 500, zero work`, async () => {
       delete process.env.CRON_SECRET;
       const res = await GET(req("Bearer anything"));
@@ -50,13 +58,15 @@ describe("F-3 — cron auth fails closed", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it(`${name}: wrong bearer → 401, zero work`, async () => {
+    it(`${name}: wrong or missing bearer → 401, zero work`, async () => {
       process.env.CRON_SECRET = "s3cret";
       expect((await GET(req("Bearer wrong"))).status).toBe(401);
       expect((await GET(req())).status).toBe(401);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+  }
 
+  for (const [name, GET] of ACCOUNTS_ROUTES) {
     it(`${name}: correct bearer → runs (no-op without accounts env)`, async () => {
       process.env.CRON_SECRET = "s3cret";
       const res = await GET(req("Bearer s3cret"));

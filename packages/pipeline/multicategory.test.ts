@@ -122,9 +122,16 @@ describe("E-E multi-category scaffolds", () => {
       { ...adapters(), sources: [artTier1] },
       artOrder(),
     );
+    // P2 counterfactual: the RAW deterministic tier must actually be confident
+    // here — otherwise the test proves nothing about the cap. With every
+    // identity key Tier-1-resolved, the raw score is gold/silver/bronze…
+    expect(["gold", "silver", "bronze"]).toContain(res.rawScore.tier);
+    // …and the cap is what turns it into the presented Flagged.
+    expect(res.snapshot.score.tier).toBe("flagged");
     expect(["gold", "silver", "bronze"]).not.toContain(res.snapshot.score.tier);
     expect(res.snapshot.capReason).toBe("uncalibrated_category");
     // Composite + CI are preserved — only the presented tier is capped.
+    expect(res.snapshot.score.composite).toBe(res.rawScore.composite);
     expect(res.snapshot.score.composite).toBeGreaterThan(0);
   });
 

@@ -24,6 +24,12 @@ import type { SanctionsAdapter } from "@/packages/adapters/sanctions";
 import type { VisionRedFlag } from "@/packages/adapters/vision";
 
 const CORPUS_MATCH_THRESHOLD = 0.35;
+// P2 (fix brief v04): a vision-ADDED value (the owner never declared this key)
+// has no human assertion behind it — only the model's reading. It must clear a
+// STRONGER corpus bar than a declared value before the corpus is allowed to
+// corroborate it; a marginal cosine echo must not credit a model-originated
+// attribute. Declared and vision-changed values keep the ordinary bar.
+const VISION_ADDED_CORPUS_THRESHOLD = 0.6;
 
 // CI scale factor (§7.2) — higher = data dominates the prior (tighter CI).
 // Coins carry the richest machine-readable data (PCGS + Numista APIs, die-match),
@@ -120,13 +126,16 @@ export async function enrich(
         citation = { name: resolved.name, url: resolved.url, retrievalState: "retrieved", tier: 1 };
         corroboratedAttributes[idKey.key] = value; // Tier-1 closed it (R-2)
       } else {
-        // Corpus corroboration (Tier 2–3) — cite, never close.
+        // Corpus corroboration (Tier 2–3) — cite, never close. A vision-added
+        // value (owner never declared this key) must clear the stronger bar.
+        const visionAddedValue = claimed === undefined;
+        const corpusBar = visionAddedValue ? VISION_ADDED_CORPUS_THRESHOLD : CORPUS_MATCH_THRESHOLD;
         const top = await retrieveTopK(repo, adapters.embedder, {
           category: report.category,
           query: `${idKey.key} ${value}`,
           k: 1,
         });
-        if (top.length && top[0].score >= CORPUS_MATCH_THRESHOLD) {
+        if (top.length && top[0].score >= corpusBar) {
           authorityState = "corpus";
           credit = 0.5;
           present = true;

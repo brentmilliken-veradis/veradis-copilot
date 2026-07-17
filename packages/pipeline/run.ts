@@ -48,7 +48,12 @@ export interface PipelineResult {
   report: Report;
   version: ReportVersion;
   snapshot: ReportSnapshot;
+  /** The PRESENTED score — tier capped for uncalibrated/vision-reroute (F-1/F-2). */
   score: PcsScore;
+  /** The RAW deterministic score before any cap. Equals `score` when uncapped;
+   *  on a capped report it exposes the tier the scorer actually produced, so
+   *  the cap is auditable and provably load-bearing. */
+  rawScore: PcsScore;
   corrections: Correction[];
   profile: CategoryProfile;
   /** External adapters that ran as stubs (and the env key each needs). */
@@ -240,6 +245,7 @@ export async function runProvisional(
     version,
     snapshot: sealed,
     score: presented,
+    rawScore: score,
     corrections: ing.corrections,
     profile: ing.profile,
     stubs: listStubbed(),
