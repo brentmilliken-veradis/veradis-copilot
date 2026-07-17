@@ -7,7 +7,7 @@
 import { InMemoryRepository } from "@/packages/data/in-memory";
 import { buildCoin2007 } from "@/packages/fixtures/coin-2007";
 import type { Repository } from "@/packages/data/repository";
-import { StubStorage, type Storage } from "@/packages/adapters/storage";
+import { getStorage, type Storage } from "@/packages/adapters/storage";
 import { getEmailer, type Emailer } from "@/packages/adapters/email";
 import { getVisionAdapter } from "@/packages/adapters/vision";
 import { pcgsAdapter, numistaAdapter } from "@/packages/adapters/source";
@@ -54,7 +54,7 @@ async function seed(): Promise<AppStore> {
     ciHi: snap.score.ci.hi,
     pdfPath: null,
   });
-  const storage = new StubStorage();
+  const storage = getStorage(); // Supabase Storage with creds, else in-memory stub
   return { repo, storage, emailer: getEmailer(), adapters: buildAdapters(storage), seededReportId: report.id };
 }
 
