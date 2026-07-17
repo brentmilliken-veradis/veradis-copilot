@@ -53,13 +53,16 @@ export async function deliverReport(
   const html = renderReport(snapshot);
   const filePath = await accounts.uploadReportFile(row.user_id, row.id, html);
 
+  // F-8: only a real expert-set band ever crosses the bridge — never 0–0,
+  // never a partial band.
   const val = snapshot.valuation;
+  const hasBand =
+    val && val.fmvLo !== undefined && val.fmvHi !== undefined && !(val.fmvLo === 0 && val.fmvHi === 0);
   await accounts.updateReport(row.id, {
     status: "delivered",
     file_path: filePath,
     pcs_score: version.composite != null ? Math.round(version.composite) : undefined,
-    valuation:
-      val && (val.fmvLo || val.fmvHi) ? `${val.currency} ${val.fmvLo}–${val.fmvHi}` : undefined,
+    valuation: hasBand ? `${val.currency} ${val.fmvLo}–${val.fmvHi}` : undefined,
     delivered_at: now(),
   });
 

@@ -80,8 +80,11 @@ export interface RankedAction {
 
 export interface Valuation {
   currency: string;
-  fmvLo: number;
-  fmvHi: number;
+  /** Indicative FMV band — EXPERT-SET at curator confirm (F-8, D-3). The
+   *  engine never synthesises a band: a provisional Appraise omits both and
+   *  renders "Indicative value — under expert review". */
+  fmvLo?: number;
+  fmvHi?: number;
   sellLo?: number;
   sellHi?: number;
   insureValue?: number;

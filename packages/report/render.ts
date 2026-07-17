@@ -102,8 +102,14 @@ function valuation(s: ReportSnapshot): string {
   const actions = v.actions
     .map((a) => `<li>${esc(a.action)} <span class="eff">${esc(a.expectedBandEffect)}</span></li>`)
     .join("");
+  // F-8: only an expert-set band is ever shown as a number. No band — or a
+  // degenerate 0–0 — renders the under-review line instead. Never fabricate.
+  const hasBand = v.fmvLo !== undefined && v.fmvHi !== undefined && !(v.fmvLo === 0 && v.fmvHi === 0);
+  const band = hasBand
+    ? `<p class="fmv">${esc(v.currency)} ${v.fmvLo!.toLocaleString()}–${v.fmvHi!.toLocaleString()}</p>`
+    : `<p class="fmv-pending">Indicative value — under expert review</p>`;
   return `<section class="appraise"><h2>Indicative fair market value</h2>
-    <p class="fmv">${esc(v.currency)} ${v.fmvLo.toLocaleString()}–${v.fmvHi.toLocaleString()}</p>
+    ${band}
     <h3>Comparable sales</h3>
     <table><thead><tr><th>Source</th><th>Venue</th><th>Date</th><th>Result</th><th>Basis</th></tr></thead><tbody>${comps}</tbody></table>
     <h3>Actions</h3><ol class="actions">${actions}</ol></section>`;

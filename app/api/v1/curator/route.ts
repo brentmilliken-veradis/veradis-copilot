@@ -17,6 +17,8 @@ export async function POST(request: Request) {
     credentialClass?: CredentialClass;
     verb?: CuratorVerb;
     downgradeTo?: Tier;
+    /** F-8: expert-set Appraise band (band-entry UI lives in the account-template admin flow). */
+    valuationBand?: { currency: string; lo: number; hi: number };
   };
   try {
     body = await request.json();
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
       credentialClass: body.credentialClass ?? "curator",
       verb: body.verb,
       downgradeTo: body.downgradeTo,
+      valuationBand: body.valuationBand,
     });
     // E-D — a confirmed definitive replaces the provisional on the collector's
     // object (same file path, upsert). Bridge failure must not sink the

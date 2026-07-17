@@ -190,12 +190,13 @@ export async function runProvisional(
     corrections: ing.corrections.map((c) => ({ claimed: c.claimed, correctedValue: c.correctedValue })),
   });
 
+  // F-8 (D-3): the engine NEVER synthesises a valuation band. A provisional
+  // Appraise carries no number — the indicative band is expert-set at curator
+  // confirm and rendered under the honesty ceiling.
   const valuation: Valuation | undefined =
     order.sku === "appraise"
       ? {
           currency: order.currency ?? "CAD",
-          fmvLo: 0,
-          fmvHi: 0,
           comps: [],
           factors: [],
           actions: [{ rank: 1, action: "Supply comparable-sale evidence to tighten the valuation", expectedBandEffect: "Narrows the FMV band" }],

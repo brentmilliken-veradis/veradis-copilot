@@ -17,6 +17,9 @@ export interface ConfirmInput {
   verb: CuratorVerb;
   /** For a downgrade, the (lower) tier to step to. */
   downgradeTo?: Tier;
+  /** F-8 (D-3): the EXPERT-SET indicative band for an Appraise. The engine
+   *  never invents one — this is the only way a number enters the report. */
+  valuationBand?: { currency: string; lo: number; hi: number };
 }
 
 export interface ConfirmResult {
@@ -66,6 +69,18 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
   if (input.verb === "downgraded" && input.downgradeTo) {
     tier = applyCritic(tier, input.downgradeTo); // never inflates
   }
+
+  // F-8: apply the expert-set indicative band (Appraise only, sane values).
+  let valuation = prevSnap.valuation;
+  if (input.valuationBand) {
+    const { currency, lo, hi } = input.valuationBand;
+    if (!valuation) throw new Error("valuationBand supplied for a report with no Appraise valuation section");
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo < 0 || hi < lo || (lo === 0 && hi === 0)) {
+      throw new Error("valuationBand must satisfy 0 ≤ lo ≤ hi and not be 0–0");
+    }
+    valuation = { ...valuation, currency, fmvLo: lo, fmvHi: hi };
+  }
+
   const nextV = provisional.v + 1;
   const sealed = sealVersion(
     {
@@ -73,6 +88,7 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
       v: nextV,
       provisional: false,
       score: { ...prevSnap.score, tier },
+      valuation,
       snapshotSha256: undefined,
       supersedesSha256: undefined,
     },
