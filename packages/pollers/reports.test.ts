@@ -6,6 +6,7 @@ import {
   declaredAttributesFor,
   mapAccountsCategory,
   pollReports,
+  processAccountsReport,
   type ReportPollerAccounts,
   type ReportPollerDeps,
 } from "./reports";
@@ -188,6 +189,85 @@ describe("pollReports", () => {
     const byId = Object.fromEntries(summary.results.map((r) => [r.reportId, r]));
     expect(byId["rep-2"].reason).toMatch(/unmapped category/);
     expect(byId["rep-3"].reason).toMatch(/not found/);
+  });
+
+  it("F-5a: two concurrent ticks over one row — one claims + delivers, one skips, one pipeline run", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    const row = accounts.queue[0];
+
+    const [r1, r2] = await Promise.all([
+      processAccountsReport(d, { ...row }),
+      processAccountsReport(d, { ...row }),
+    ]);
+
+    const outcomes = [r1.outcome, r2.outcome].sort();
+    expect(outcomes).toEqual(["delivered", "skipped"]);
+    expect([r1, r2].find((r) => r.outcome === "skipped")?.reason).toBe("claimed by another tick");
+    // Exactly one production: one copilot report, one upload, one write-back.
+    expect((await d.repo.listReports()).filter((r) => r.orderId === "rep-1")).toHaveLength(1);
+    expect(accounts.uploads).toHaveLength(1);
+    expect(accounts.patches).toHaveLength(1);
+  });
+
+  it("F-5a: a throwing pipeline records the attempt and is NOT re-burnt next tick", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    d.adapters.vision = {
+      name: "vision:boom",
+      analyze: async () => {
+        throw new Error("vision exploded");
+      },
+    };
+
+    const first = await pollReports(d);
+    expect(first.results[0]).toMatchObject({ outcome: "failed", reason: "vision exploded" });
+    const order = await d.repo.getOrder("rep-1");
+    expect(order?.productionState).toBe("producing");
+    expect(order?.attempts).toBe(1);
+    expect(order?.lastError).toBe("vision exploded");
+
+    // Immediate next tick: the fresh claim blocks a second paid pipeline run.
+    const reportsBefore = (await d.repo.listReports()).length;
+    const second = await pollReports(d);
+    expect(second.results[0]).toMatchObject({ outcome: "skipped", reason: "claimed by another tick" });
+    expect((await d.repo.listReports()).length).toBe(reportsBefore);
+  });
+
+  it("F-5a: a stale 'producing' claim is reclaimed; attempts exhaust to terminal failed", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    d.adapters.vision = {
+      name: "vision:boom",
+      analyze: async () => {
+        throw new Error("still broken");
+      },
+    };
+
+    const t0 = Date.parse("2026-07-17T12:00:00Z");
+    d.now = () => new Date(t0);
+    await pollReports(d); // attempt 1 fails
+
+    d.now = () => new Date(t0 + 16 * 60 * 1000); // past the staleness window
+    const second = await pollReports(d); // reclaim → attempt 2 fails
+    expect(second.results[0].outcome).toBe("failed");
+    expect((await d.repo.getOrder("rep-1"))?.attempts).toBe(2);
+
+    d.now = () => new Date(t0 + 32 * 60 * 1000);
+    const third = await pollReports(d); // attempt 3 fails → terminal
+    expect(third.results[0].outcome).toBe("failed");
+    const order = await d.repo.getOrder("rep-1");
+    expect(order?.attempts).toBe(3);
+    expect(order?.productionState).toBe("failed");
+
+    // And from then on the row is surfaced, not retried.
+    d.now = () => new Date(t0 + 48 * 60 * 1000);
+    const fourth = await pollReports(d);
+    expect(fourth.results[0].outcome).toBe("skipped");
+    expect(fourth.results[0].reason).toMatch(/failed previously/);
   });
 
   it("F-4: a report row pointing at another tenant's object is never produced or delivered", async () => {

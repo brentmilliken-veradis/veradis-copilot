@@ -13,7 +13,7 @@ import type {
   AccountsProfileRow,
   AccountsReportRow,
 } from "@/packages/adapters/accounts";
-import type { Repository } from "@/packages/data/repository";
+import { DuplicateOrderError, type Repository } from "@/packages/data/repository";
 import type { Storage } from "@/packages/adapters/storage";
 import type { Emailer } from "@/packages/adapters/email";
 import { normalizePhoto } from "@/packages/adapters/photos";
@@ -36,6 +36,8 @@ export interface ReportPollerDeps {
   storage: Storage;
   adapters: PipelineAdapters;
   emailer: Emailer;
+  /** Injectable clock (staleness window tests). */
+  now?: () => Date;
 }
 
 export interface ProcessedReport {
@@ -96,27 +98,64 @@ async function downloadPhotos(deps: ReportPollerDeps, obj: AccountsObjectRow): P
   return photos;
 }
 
+/** F-5a: production attempts before a row is marked terminally failed. */
+export const MAX_PRODUCTION_ATTEMPTS = 3;
+/** F-5a: a 'producing' claim older than this is presumed crashed → reclaim. */
+export const STALE_CLAIM_MS = 15 * 60 * 1000;
+
 /** Produce + deliver one queued accounts report. Also used by the enrich
- *  writer's `reverify` job (the reverify endpoint pre-inserts the row). */
+ *  writer's `reverify` job (the reverify endpoint pre-inserts the row).
+ *  F-5a: the copilot orders.id PK is the ATOMIC CLAIM — claim first, produce
+ *  after; a throwing pipeline is retried at most MAX_PRODUCTION_ATTEMPTS
+ *  times (via the staleness window), then surfaced as failed. */
 export async function processAccountsReport(
   deps: ReportPollerDeps,
   row: AccountsReportRow,
 ): Promise<ProcessedReport> {
-  // Already produced? Then production is done — retry only the delivery half
-  // (covers a crash between produce and write-back).
+  const now = deps.now ?? (() => new Date());
   const existingOrder = await deps.repo.getOrder(row.id);
+  let reclaimed = false;
+
   if (existingOrder) {
-    const copilotReport = await deps.repo.getReportByOrderId(row.id); // F-6: bounded lookup
-    const version = copilotReport ? await deps.repo.getLatestVersion(copilotReport.id) : null;
-    if (!copilotReport || !version) {
-      return { reportId: row.id, outcome: "failed", reason: "order exists but no copilot report/version" };
+    switch (existingOrder.productionState) {
+      case "produced": {
+        // Production done — retry only the delivery half (crash between
+        // produce and write-back), plus the curator email if it was lost (F-12).
+        const copilotReport = await deps.repo.getReportByOrderId(row.id); // F-6: bounded lookup
+        const version = copilotReport ? await deps.repo.getLatestVersion(copilotReport.id) : null;
+        if (!copilotReport || !version) {
+          return { reportId: row.id, outcome: "failed", reason: "order exists but no copilot report/version" };
+        }
+        const redo = await deliverReport(deps.accounts, copilotReport, version);
+        return redo.delivered
+          ? { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" }
+          : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
+      }
+      case "failed":
+        // Terminal — surfaced to the curator, never silently re-burnt.
+        return { reportId: row.id, outcome: "skipped", reason: `failed previously: ${existingOrder.lastError ?? "see logs"}` };
+      case "producing": {
+        const claimedAtMs = existingOrder.claimedAt ? Date.parse(existingOrder.claimedAt) : 0;
+        if (now().getTime() - claimedAtMs < STALE_CLAIM_MS) {
+          return { reportId: row.id, outcome: "skipped", reason: "claimed by another tick" };
+        }
+        if (existingOrder.attempts >= MAX_PRODUCTION_ATTEMPTS) {
+          await deps.repo.updateOrder(row.id, {
+            productionState: "failed",
+            lastError: existingOrder.lastError ?? "max production attempts exhausted",
+          });
+          return { reportId: row.id, outcome: "failed", reason: "max production attempts exhausted" };
+        }
+        // Crash recovery: reclaim the stale row and try again.
+        await deps.repo.updateOrder(row.id, { claimedAt: now().toISOString(), attempts: existingOrder.attempts + 1 });
+        reclaimed = true;
+        break;
+      }
     }
-    const redo = await deliverReport(deps.accounts, copilotReport, version);
-    return redo.delivered
-      ? { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" }
-      : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
   }
 
+  // Cheap reads BEFORE the claim — a row that can never produce is rejected
+  // without consuming an order row / attempt.
   const obj = await deps.accounts.getObject(row.object_id);
   if (!obj) return { reportId: row.id, outcome: "failed", reason: `object ${row.object_id} not found` };
   // F-4: never produce/deliver across tenants — the report row's user must own
@@ -133,9 +172,6 @@ export async function processAccountsReport(
   const profile = await deps.accounts.getProfile(row.user_id);
   if (!profile?.email) return { reportId: row.id, outcome: "failed", reason: "collector profile/email not found" };
 
-  const photos = await downloadPhotos(deps, obj);
-  if (!photos.length) return { reportId: row.id, outcome: "failed", reason: "no photos downloadable" };
-
   const parsed: ParsedVeradisIntake = {
     reportId: row.id,
     objectId: obj.id,
@@ -149,18 +185,47 @@ export async function processAccountsReport(
     photoPaths: obj.photo_paths ?? [],
   };
 
-  const result = await runProvisional(deps.repo, deps.storage, deps.adapters, toOrderIntake(parsed, photos));
+  // The claim: first tick to insert the order owns production.
+  if (!reclaimed) {
+    try {
+      await deps.repo.createOrder({
+        id: parsed.reportId,
+        tallySubmissionId: `veradis:${parsed.reportId}`,
+        email: parsed.email,
+        ownerName: parsed.ownerName,
+        category: parsed.category,
+        sku: parsed.sku,
+        productionState: "producing",
+        attempts: 1,
+        claimedAt: now().toISOString(),
+      });
+    } catch (e) {
+      if (e instanceof DuplicateOrderError) {
+        return { reportId: row.id, outcome: "skipped", reason: "claimed by another tick" };
+      }
+      throw e;
+    }
+  }
+  const order = (await deps.repo.getOrder(row.id))!;
 
-  // The order row marks "produced" — created only after a successful run so a
-  // failed pipeline retries cleanly on the next tick.
-  const order = await deps.repo.createOrder({
-    id: parsed.reportId,
-    tallySubmissionId: `veradis:${parsed.reportId}`,
-    email: parsed.email,
-    ownerName: parsed.ownerName,
-    category: parsed.category,
-    sku: parsed.sku,
-  });
+  // Production. A throw records the attempt; retry happens after the
+  // staleness window, up to MAX_PRODUCTION_ATTEMPTS.
+  let result;
+  try {
+    const photos = await downloadPhotos(deps, obj);
+    if (!photos.length) throw new Error("no photos downloadable");
+    result = await runProvisional(deps.repo, deps.storage, deps.adapters, toOrderIntake(parsed, photos));
+  } catch (e) {
+    const message = (e as Error).message;
+    const terminal = order.attempts >= MAX_PRODUCTION_ATTEMPTS;
+    await deps.repo.updateOrder(row.id, {
+      ...(terminal ? { productionState: "failed" as const } : {}),
+      lastError: message,
+    });
+    console.error(`report poller ${row.id}: production attempt ${order.attempts} failed:`, e);
+    return { reportId: row.id, outcome: "failed", reason: message };
+  }
+  await deps.repo.updateOrder(row.id, { productionState: "produced", lastError: null });
 
   const delivery = await deliverReport(deps.accounts, result.report, result.version);
 

@@ -53,6 +53,14 @@ class FakeAccounts implements EnrichAccounts {
     const j = this.jobs.find((x) => x.id === jobId);
     if (j) Object.assign(j, patch);
   }
+  async claimJob(jobId: string, startedAt: string): Promise<boolean> {
+    const j = this.jobs.find((x) => x.id === jobId);
+    if (!j || j.status !== "queued") return false; // conditional PATCH semantics
+    j.status = "running";
+    j.started_at = startedAt;
+    this.jobPatches.push({ jobId, patch: { status: "running", started_at: startedAt } });
+    return true;
+  }
   async listObjects(userId: string) {
     return [...this.objects.values()].filter((o) => o.user_id === userId);
   }
@@ -118,7 +126,7 @@ function deps(accounts: FakeAccounts): EnrichDeps {
     repo: new InMemoryRepository(),
     storage: new StubStorage(),
     emailer: new StubEmailer(),
-    now: () => NOW,
+    now: () => new Date(NOW),
     adapters: {
       vision: new StubVisionAdapter(),
       sources: [pcgsAdapter(), numistaAdapter()],
@@ -247,6 +255,22 @@ describe("runEnrichmentJobs", () => {
     const summary = await runEnrichmentJobs(deps(accounts));
     expect(summary.failed).toBe(1);
     expect(accounts.jobs[0].detail).toMatch(/no in_production reports row/);
+  });
+
+  it("F-5b: two concurrent ticks over one queued job — one claims, one skips", async () => {
+    const accounts = new FakeAccounts();
+    accounts.objects.set("a", obj("a", { title: "Kurland plate", maker: "KPM Berlin" }));
+    accounts.jobs.push({ id: "job-1", user_id: "user-1", object_id: "a", kind: "narrative", status: "queued", detail: null });
+    const d = deps(accounts);
+
+    const [s1, s2] = await Promise.all([runEnrichmentJobs(d), runEnrichmentJobs(d)]);
+
+    const all = [...s1.results, ...s2.results];
+    expect(all.filter((r) => r.status === "done")).toHaveLength(1);
+    expect(all.filter((r) => r.status === "skipped")).toHaveLength(1);
+    // Exactly one narrative written, one narrative_added event.
+    expect(accounts.objectPatches.filter((p) => p.patch.narrative_html)).toHaveLength(1);
+    expect(accounts.events.filter((e) => e.type === "narrative_added")).toHaveLength(1);
   });
 
   it("F-4: reverify and narrative jobs on another tenant's object fail with no writes", async () => {

@@ -23,6 +23,7 @@ import type {
   CategoryProfile,
 } from "@/packages/pcs-types";
 import { InMemoryRepository } from "./in-memory";
+import { DuplicateOrderError } from "./repository";
 import type {
   Repository,
   Order,
@@ -42,6 +43,17 @@ import type {
 } from "./repository";
 
 type Row = Record<string, unknown>;
+
+/** PostgREST error with the HTTP status attached (409 = unique violation). */
+export class RestError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+    this.name = "RestError";
+  }
+}
 
 const s = (v: unknown): string => String(v);
 const n = (v: unknown): number | null => (v == null ? null : Number(v));
@@ -170,6 +182,10 @@ const mapOrder = (r: Row): Order => ({
   category: s(r.category) as Category,
   sku: s(r.sku) as Order["sku"],
   createdAt: s(r.created_at),
+  productionState: (r.production_state ?? "producing") as Order["productionState"],
+  attempts: Number(r.attempts ?? 0),
+  claimedAt: r.claimed_at == null ? null : s(r.claimed_at),
+  lastError: r.last_error == null ? null : s(r.last_error),
 });
 
 const mapEmail = (r: Row): EmailRecord => ({
@@ -202,7 +218,7 @@ export class SupabaseRepository implements Repository {
         ...(init.headers as Record<string, string> | undefined),
       },
     });
-    if (!res.ok) throw new Error(`repo:supabase ${init.method ?? "GET"} ${pathAndQuery} → ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new RestError(`repo:supabase ${init.method ?? "GET"} ${pathAndQuery} → ${res.status} ${await res.text()}`, res.status);
     const text = await res.text();
     if (!text) return [];
     const parsed = JSON.parse(text) as unknown;
@@ -445,18 +461,44 @@ export class SupabaseRepository implements Repository {
     return (await this.rest(`corpus_chunk?corpus_document_id=in.(${ids})`)).map(mapCorpusChunk);
   }
 
-  // orders (migration 0002)
+  // orders (migrations 0002 + 0003)
   async createOrder(input: NewOrder): Promise<Order> {
-    return mapOrder(
-      await this.insert("orders", {
-        id: input.id,
-        tally_submission_id: input.tallySubmissionId,
-        email: input.email,
-        owner_name: input.ownerName,
-        category: input.category,
-        sku: input.sku,
-      }),
-    );
+    try {
+      return mapOrder(
+        await this.insert("orders", {
+          id: input.id,
+          tally_submission_id: input.tallySubmissionId,
+          email: input.email,
+          owner_name: input.ownerName,
+          category: input.category,
+          sku: input.sku,
+          ...(input.productionState !== undefined ? { production_state: input.productionState } : {}),
+          ...(input.attempts !== undefined ? { attempts: input.attempts } : {}),
+          ...(input.claimedAt !== undefined ? { claimed_at: input.claimedAt } : {}),
+        }),
+      );
+    } catch (e) {
+      // PostgREST unique violation → the losing side of the atomic claim.
+      if (e instanceof RestError && e.status === 409) throw new DuplicateOrderError(input.id);
+      throw e;
+    }
+  }
+
+  async updateOrder(
+    orderId: string,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+  ): Promise<Order> {
+    const row: Row = {};
+    if (patch.productionState !== undefined) row.production_state = patch.productionState;
+    if (patch.attempts !== undefined) row.attempts = patch.attempts;
+    if (patch.claimedAt !== undefined) row.claimed_at = patch.claimedAt;
+    if (patch.lastError !== undefined) row.last_error = patch.lastError;
+    const rows = await this.rest(`orders?id=eq.${encodeURIComponent(orderId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(row),
+    });
+    if (!rows.length) throw new Error(`order ${orderId} not found`);
+    return mapOrder(rows[0]);
   }
 
   async getOrder(orderId: string): Promise<Order | null> {

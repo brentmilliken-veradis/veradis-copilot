@@ -31,6 +31,8 @@ export interface EnrichAccounts extends ReportPollerAccounts {
     jobId: string,
     patch: { status: AccountsJobRow["status"]; started_at?: string; finished_at?: string; detail?: string },
   ): Promise<void>;
+  /** Conditional queued→running claim; false = another tick owns it (F-5b). */
+  claimJob(jobId: string, startedAt: string): Promise<boolean>;
   listObjects(userId: string): Promise<AccountsObjectRow[]>;
   listDeliveredAppraisals(userId: string): Promise<{ object_id: string; valuation: string | null }[]>;
   insertEvent(e: AccountsEventInsert): Promise<void>;
@@ -41,8 +43,10 @@ export interface EnrichAccounts extends ReportPollerAccounts {
 
 export interface EnrichDeps extends ReportPollerDeps {
   accounts: EnrichAccounts;
-  now?: () => string;
 }
+
+/** Injectable clock (inherited from ReportPollerDeps.now) as ISO 8601. */
+const nowIso = (deps: EnrichDeps): string => (deps.now ? deps.now() : new Date()).toISOString();
 
 const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -163,7 +167,7 @@ async function writeValuation(
     high: bands.reduce((a, b) => a + b.band.hi, 0),
     currency: bands[0].band.currency,
     basis: objects.length > 0 && objects.every((o) => appraisedObjects.has(o.id)) ? "full" : "partial",
-    updated_at: (deps.now ?? (() => new Date().toISOString()))(),
+    updated_at: nowIso(deps),
   };
   await deps.accounts.upsertValuation(v);
   await deps.accounts.insertEvent({
@@ -259,16 +263,22 @@ export interface EnrichSummary {
   polled: number;
   done: number;
   failed: number;
-  results: { jobId: string; kind: string; status: "done" | "failed"; detail: string }[];
+  skipped: number;
+  results: { jobId: string; kind: string; status: "done" | "failed" | "skipped"; detail: string }[];
 }
 
-/** One cron tick: queued → running → done | failed+detail, per job. */
+/** One cron tick: queued → (atomic claim) running → done | failed+detail. */
 export async function runEnrichmentJobs(deps: EnrichDeps): Promise<EnrichSummary> {
-  const now = deps.now ?? (() => new Date().toISOString());
+  const now = () => nowIso(deps);
   const jobs = await deps.accounts.listQueuedJobs();
   const results: EnrichSummary["results"] = [];
   for (const job of jobs) {
-    await deps.accounts.updateJob(job.id, { status: "running", started_at: now() });
+    // F-5b: conditional claim — a concurrent tick that lost the PATCH race skips.
+    const claimed = await deps.accounts.claimJob(job.id, now());
+    if (!claimed) {
+      results.push({ jobId: job.id, kind: job.kind, status: "skipped", detail: "claimed by another tick" });
+      continue;
+    }
     try {
       const detail = await HANDLERS[job.kind](deps, job);
       await deps.accounts.updateJob(job.id, { status: "done", finished_at: now(), detail });
@@ -284,6 +294,7 @@ export async function runEnrichmentJobs(deps: EnrichDeps): Promise<EnrichSummary
     polled: jobs.length,
     done: results.filter((r) => r.status === "done").length,
     failed: results.filter((r) => r.status === "failed").length,
+    skipped: results.filter((r) => r.status === "skipped").length,
     results,
   };
 }

@@ -15,6 +15,9 @@ import type {
   CorpusChunk,
   Category,
 } from "@/packages/pcs-types";
+import {
+  DuplicateOrderError,
+} from "./repository";
 import type {
   Repository,
   RepoEnv,
@@ -56,13 +59,37 @@ export class InMemoryRepository implements Repository {
   constructor(private env: RepoEnv = defaultEnv) {}
 
   async createOrder(input: NewOrder): Promise<Order> {
-    const order: Order = { ...input, createdAt: this.env.now() };
+    if (this.orders.has(input.id)) throw new DuplicateOrderError(input.id); // atomic claim (F-5a)
+    const order: Order = {
+      id: input.id,
+      tallySubmissionId: input.tallySubmissionId,
+      email: input.email,
+      ownerName: input.ownerName,
+      category: input.category,
+      sku: input.sku,
+      createdAt: this.env.now(),
+      productionState: input.productionState ?? "producing",
+      attempts: input.attempts ?? 0,
+      claimedAt: input.claimedAt ?? null,
+      lastError: null,
+    };
     this.orders.set(order.id, order);
-    return order;
+    return { ...order };
   }
 
   async getOrder(orderId: string): Promise<Order | null> {
-    return this.orders.get(orderId) ?? null;
+    const o = this.orders.get(orderId);
+    return o ? { ...o } : null;
+  }
+
+  async updateOrder(
+    orderId: string,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+  ): Promise<Order> {
+    const o = this.orders.get(orderId);
+    if (!o) throw new Error(`order ${orderId} not found`);
+    Object.assign(o, patch);
+    return { ...o };
   }
 
   async getOrderByTallySubmission(submissionId: string): Promise<Order | null> {

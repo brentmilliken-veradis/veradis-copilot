@@ -87,17 +87,22 @@ export interface Repository {
   addCorpusChunk(input: NewCorpusChunk): Promise<CorpusChunk>;
   listCorpusChunks(category: Category): Promise<CorpusChunk[]>;
 
-  // orders (Tally intake) — tallySubmissionId is the webhook dedupe key
+  // orders — tallySubmissionId is the dedupe key; the id PK is the atomic
+  // claim (createOrder throws DuplicateOrderError on an existing id).
   createOrder(input: NewOrder): Promise<Order>;
   getOrder(orderId: string): Promise<Order | null>;
   getOrderByTallySubmission(submissionId: string): Promise<Order | null>;
+  updateOrder(
+    orderId: string,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+  ): Promise<Order>;
 
   // outbound email log (EMAIL A/B/C audit trail)
   recordEmail(input: NewEmailRecord): Promise<EmailRecord>;
   listEmails(orderId: string): Promise<EmailRecord[]>;
 }
 
-/** A paid Tally submission — the commercial side of a report. */
+/** A paid order — the commercial side of a report (Tally or store queue). */
 export interface Order {
   id: string;
   tallySubmissionId: string;
@@ -106,9 +111,28 @@ export interface Order {
   category: Category;
   sku: "verify" | "appraise";
   createdAt: string;
+  /** F-5a production lifecycle: the order row IS the poller's atomic claim.
+   *  producing = claimed/in flight · produced = pipeline succeeded ·
+   *  failed = terminal after max attempts (surfaced, never retried). */
+  productionState: "producing" | "produced" | "failed";
+  attempts: number;
+  claimedAt: string | null;
+  lastError: string | null;
 }
 
-export type NewOrder = Omit<Order, "createdAt">;
+export type NewOrder = Omit<Order, "createdAt" | "productionState" | "attempts" | "claimedAt" | "lastError"> & {
+  productionState?: Order["productionState"];
+  attempts?: number;
+  claimedAt?: string | null;
+};
+
+/** createOrder on an existing id — the losing side of an atomic claim. */
+export class DuplicateOrderError extends Error {
+  constructor(orderId: string) {
+    super(`order ${orderId} already exists`);
+    this.name = "DuplicateOrderError";
+  }
+}
 
 export type EmailKind = "received" | "curator_review" | "definitive";
 

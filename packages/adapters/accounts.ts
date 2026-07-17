@@ -201,6 +201,21 @@ export class VeradisAccountsClient {
     });
   }
 
+  /** F-5b (COORDINATE) — conditional claim: queued → running only when still
+   *  queued. Returns false when another tick already owns the job. Uses only
+   *  the existing enrichment_jobs columns/status values. */
+  async claimJob(jobId: string, startedAt: string): Promise<boolean> {
+    const rows = await this.rest(
+      `enrichment_jobs?id=eq.${encodeURIComponent(jobId)}&status=eq.queued`,
+      {
+        method: "PATCH",
+        headers: { prefer: "return=representation" },
+        body: JSON.stringify({ status: "running", started_at: startedAt }),
+      },
+    );
+    return rows.length > 0;
+  }
+
   async insertEvent(e: AccountsEventInsert): Promise<void> {
     await this.rest("enrichment_events", { method: "POST", body: JSON.stringify(e) });
   }
