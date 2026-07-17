@@ -15,6 +15,9 @@ import type {
   CorpusChunk,
   Category,
 } from "@/packages/pcs-types";
+import {
+  DuplicateOrderError,
+} from "./repository";
 import type {
   Repository,
   RepoEnv,
@@ -56,13 +59,57 @@ export class InMemoryRepository implements Repository {
   constructor(private env: RepoEnv = defaultEnv) {}
 
   async createOrder(input: NewOrder): Promise<Order> {
-    const order: Order = { ...input, createdAt: this.env.now() };
+    if (this.orders.has(input.id)) throw new DuplicateOrderError(input.id); // atomic claim (F-5a)
+    const order: Order = {
+      id: input.id,
+      tallySubmissionId: input.tallySubmissionId,
+      email: input.email,
+      ownerName: input.ownerName,
+      category: input.category,
+      sku: input.sku,
+      createdAt: this.env.now(),
+      productionState: input.productionState ?? "producing",
+      attempts: input.attempts ?? 0,
+      claimedAt: input.claimedAt ?? null,
+      lastError: null,
+    };
     this.orders.set(order.id, order);
-    return order;
+    return { ...order };
   }
 
   async getOrder(orderId: string): Promise<Order | null> {
-    return this.orders.get(orderId) ?? null;
+    const o = this.orders.get(orderId);
+    return o ? { ...o } : null;
+  }
+
+  async updateOrder(
+    orderId: string,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+  ): Promise<Order> {
+    const o = this.orders.get(orderId);
+    if (!o) throw new Error(`order ${orderId} not found`);
+    Object.assign(o, patch);
+    return { ...o };
+  }
+
+  async reclaimStaleOrder(
+    orderId: string,
+    expected: { claimedAt: string | null; attempts: number },
+    newClaimedAt: string,
+  ): Promise<Order | null> {
+    // Synchronous check-and-set — atomic w.r.t. async interleavings (R-3).
+    const o = this.orders.get(orderId);
+    if (
+      !o ||
+      o.productionState !== "producing" ||
+      o.claimedAt !== expected.claimedAt ||
+      o.attempts !== expected.attempts
+    ) {
+      return null;
+    }
+    o.claimedAt = newClaimedAt;
+    o.attempts = expected.attempts + 1;
+    return { ...o };
   }
 
   async getOrderByTallySubmission(submissionId: string): Promise<Order | null> {
@@ -99,6 +146,22 @@ export class InMemoryRepository implements Repository {
   async getReport(id: string): Promise<Report | null> {
     const r = this.reports.get(id);
     return r ? { ...r } : null;
+  }
+
+  async getReportByOrderId(orderId: string): Promise<Report | null> {
+    for (const r of this.reports.values()) {
+      if (r.orderId === orderId) return { ...r };
+    }
+    return null;
+  }
+
+  async listReportsByStatus(status: Report["status"], limit: number): Promise<Report[]> {
+    const out: Report[] = [];
+    for (const r of this.reports.values()) {
+      if (r.status === status) out.push({ ...r });
+      if (out.length >= limit) break;
+    }
+    return out;
   }
 
   async updateReport(

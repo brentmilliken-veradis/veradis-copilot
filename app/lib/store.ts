@@ -1,20 +1,22 @@
-// App-level in-memory store. Until the live veradis-copilot Supabase project is
-// provisioned (BUILD-KICKOFF §8), the running app is backed by InMemoryRepository
-// seeded with the 2007-coin fixture as a provisional report, so the curator flow
-// works end-to-end in `npm run dev` without a database. A global singleton keeps
-// state across requests (and HMR) within the dev process.
+// App-level store (E-F data-layer flip). With copilot Supabase creds present
+// (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY → project veradis-copilot,
+// lpfmaaeuojextcqhsivs), the app runs on SupabaseRepository + Supabase Storage.
+// Without creds it falls back to InMemoryRepository seeded with the 2007-coin
+// fixture, so the curator flow works end-to-end in `npm run dev` without a
+// database. A global singleton keeps state across requests (and HMR).
 
 import { InMemoryRepository } from "@/packages/data/in-memory";
+import { getRepository } from "@/packages/data/supabase";
 import { buildCoin2007 } from "@/packages/fixtures/coin-2007";
 import type { Repository } from "@/packages/data/repository";
-import { StubStorage, type Storage } from "@/packages/adapters/storage";
+import { getStorage, type Storage } from "@/packages/adapters/storage";
 import { getEmailer, type Emailer } from "@/packages/adapters/email";
 import { getVisionAdapter } from "@/packages/adapters/vision";
 import { pcgsAdapter, numistaAdapter } from "@/packages/adapters/source";
 import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
-import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
+import { getNarrativeAdapter } from "@/packages/adapters/narrative";
 import type { PipelineAdapters } from "@/packages/pipeline/run";
 
 export interface AppStore {
@@ -22,22 +24,25 @@ export interface AppStore {
   storage: Storage;
   emailer: Emailer;
   adapters: PipelineAdapters;
+  /** Fixture report id when running on the in-memory fallback; "" when live. */
   seededReportId: string;
 }
 
-function buildAdapters(): PipelineAdapters {
+function buildAdapters(storage: Storage): PipelineAdapters {
   return {
-    vision: getVisionAdapter(),
+    // Live vision needs the storage to load image bytes for Claude image blocks.
+    vision: getVisionAdapter({}, storage),
     sources: [pcgsAdapter(), numistaAdapter()],
     embedder: new StubEmbeddingAdapter(),
     graph: new StubGraphAdapter(),
     sanctions: new StubSanctionsAdapter(),
-    narrative: new StubNarrativeAdapter(),
+    narrative: getNarrativeAdapter(),
   };
 }
 
-async function seed(): Promise<AppStore> {
-  const repo = new InMemoryRepository();
+/** Dev-only fixture so the curator flow has something to review in-memory.
+ *  Never runs against the live database. */
+async function seedFixture(repo: Repository): Promise<string> {
   const snap = buildCoin2007(1, { provisional: true });
   const report = await repo.createReport({ orderId: "seed-order", objectId: snap.objectId, category: "coins" });
   await repo.updateReport(report.id, { status: "provisional", currentVersion: snap.v });
@@ -53,11 +58,18 @@ async function seed(): Promise<AppStore> {
     ciHi: snap.score.ci.hi,
     pdfPath: null,
   });
-  return { repo, storage: new StubStorage(), emailer: getEmailer(), adapters: buildAdapters(), seededReportId: report.id };
+  return report.id;
+}
+
+async function init(): Promise<AppStore> {
+  const repo = getRepository(); // SupabaseRepository with creds, else InMemory
+  const storage = getStorage(); // Supabase Storage with creds, else in-memory stub
+  const seededReportId = repo instanceof InMemoryRepository ? await seedFixture(repo) : "";
+  return { repo, storage, emailer: getEmailer(), adapters: buildAdapters(storage), seededReportId };
 }
 
 const g = globalThis as unknown as { __veradisStore?: Promise<AppStore> };
 
 export function getStore(): Promise<AppStore> {
-  return (g.__veradisStore ??= seed());
+  return (g.__veradisStore ??= init());
 }

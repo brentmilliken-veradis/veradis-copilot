@@ -1,0 +1,38 @@
+{
+  "category": "art",
+  "version": 1,
+  "calibration": "provisional",
+  "label": "Art — paintings, works on paper (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "identityKeys": [
+    { "key": "artist", "label": "Artist / attribution", "weight": 0.3 },
+    { "key": "signature_inscription", "label": "Signature / inscription", "weight": 0.25 },
+    { "key": "title", "label": "Title / subject", "weight": 0.15 },
+    { "key": "medium", "label": "Medium / support", "weight": 0.15 },
+    { "key": "dimensions", "label": "Dimensions", "weight": 0.15 }
+  ],
+  "identityNeverKeys": ["serial"],
+  "captureSlots": [
+    { "slotId": "front_full", "label": "Front (full)", "guidance": "Whole work, square-on, even light, unframed edge visible if possible.", "requiredFor": "identity", "core": true },
+    { "slotId": "signature_macro", "label": "Signature macro", "guidance": "Macro of the signature, monogram, or inscription.", "requiredFor": "identity", "core": true, "unlocks": ["catalogue_raisonne_match"] },
+    { "slotId": "verso_back", "label": "Verso / back", "guidance": "Back of the work: labels, stamps, inscriptions, stretcher.", "requiredFor": "custody", "core": true, "unlocks": ["label_trace"] },
+    { "slotId": "detail_raking_light", "label": "Detail in raking light", "guidance": "Surface texture in raking light — brushwork, craquelure, print dots.", "requiredFor": "material", "core": true },
+    { "slotId": "frame_edge", "label": "Frame / edge", "guidance": "Edge of the support and frame rebate.", "requiredFor": "material", "core": false },
+    { "slotId": "provenance_documents", "label": "Provenance documents", "guidance": "Receipts, exhibition labels, correspondence, prior sale records.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "signature_added", "label": "Later-added signature", "description": "Signature applied later or over varnish to upgrade an unsigned work." },
+    { "key": "print_as_painting", "label": "Reproduction as original", "description": "Mechanical reproduction (print dots, uniform surface) presented as an original work." },
+    { "key": "attribution_upgrade", "label": "Attribution upgrade", "description": "Workshop, school, or follower piece presented as an autograph work." },
+    { "key": "overcleaned_restored", "label": "Over-cleaned / heavily restored", "description": "Extensive overpaint or abrasion concealed by varnish." },
+    { "key": "relined_altered", "label": "Relined / altered support", "description": "Relining or trimming that removed original evidence (labels, edges, inscriptions)." }
+  ],
+  "corpusSources": [
+    { "name": "Catalogue raisonné (per artist)", "tier": 1, "role": "ground_truth" },
+    { "name": "Artist foundation / estate records", "tier": 1, "role": "ground_truth" },
+    { "name": "Auction archives (Christie's, Sotheby's, Bonhams)", "tier": 2, "role": "corroboration" },
+    { "name": "Artnet / askART price databases", "tier": 2, "role": "corroboration", "url": "https://www.artnet.com" },
+    { "name": "Collector and dealer forums", "tier": 4, "role": "cite_only" }
+  ],
+  "compKeys": ["artist", "medium", "dimensions", "year", "subject"],
+  "materialSlotClass": "surface_and_support"
+}

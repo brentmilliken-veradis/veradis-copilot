@@ -17,6 +17,9 @@ export interface ConfirmInput {
   verb: CuratorVerb;
   /** For a downgrade, the (lower) tier to step to. */
   downgradeTo?: Tier;
+  /** F-8 (D-3): the EXPERT-SET indicative band for an Appraise. The engine
+   *  never invents one — this is the only way a number enters the report. */
+  valuationBand?: { currency: string; lo: number; hi: number };
 }
 
 export interface ConfirmResult {
@@ -35,7 +38,37 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
   const provisional = await repo.getLatestVersion(input.reportId);
   if (!provisional) throw new Error(`report ${input.reportId} has no version to confirm`);
 
-  // Immutable, signed, credentialed record of the human decision.
+  // R-6 (fix brief v04): validate ALL inputs BEFORE minting the immutable,
+  // signed curator action — an invalid input must never leave an orphaned
+  // audit row that a retry then duplicates.
+
+  // F-1/F-2 gate (fix brief v03): a capped report — uncalibrated category or
+  // vision-only re-route — can never seal a definitive tier. Withholding (the
+  // refund/curator-mediated path) remains available.
+  const prevSnap = provisional.snapshotJson;
+  const capReason = prevSnap.capReason;
+  if (capReason && input.verb !== "withheld") {
+    throw new Error(
+      `report ${input.reportId} is capped (${capReason}) — cannot confirm to definitive until the category is calibrated and the attribution corroborated`,
+    );
+  }
+
+  // F-8: validate the expert-set indicative band (Appraise only, sane values)
+  // and pre-compute the sealed valuation. Runs before addCuratorAction (R-6).
+  // A withheld report never seals a band, so a stray band on a withhold is
+  // ignored, not validated (Cleanup 1) — the admin form leaving a band field
+  // populated must not block a withhold.
+  let valuation = prevSnap.valuation;
+  if (input.valuationBand && input.verb !== "withheld") {
+    const { currency, lo, hi } = input.valuationBand;
+    if (!valuation) throw new Error("valuationBand supplied for a report with no Appraise valuation section");
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo < 0 || hi < lo || (lo === 0 && hi === 0)) {
+      throw new Error("valuationBand must satisfy 0 ≤ lo ≤ hi and not be 0–0");
+    }
+    valuation = { ...valuation, currency, fmvLo: lo, fmvHi: hi };
+  }
+
+  // Inputs are valid — mint the immutable, signed, credentialed record.
   const action = await repo.addCuratorAction({
     reportId: report.id,
     curator: input.curator,
@@ -51,11 +84,11 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
   }
 
   // Confirmed / downgraded → mint the definitive version.
-  const prevSnap = provisional.snapshotJson;
   let tier = prevSnap.score.tier;
   if (input.verb === "downgraded" && input.downgradeTo) {
     tier = applyCritic(tier, input.downgradeTo); // never inflates
   }
+
   const nextV = provisional.v + 1;
   const sealed = sealVersion(
     {
@@ -63,6 +96,7 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
       v: nextV,
       provisional: false,
       score: { ...prevSnap.score, tier },
+      valuation,
       snapshotSha256: undefined,
       supersedesSha256: undefined,
     },

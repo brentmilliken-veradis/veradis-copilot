@@ -85,6 +85,13 @@ describe("InMemoryRepository", () => {
     expect(await repo.listCuratorActions(r.id)).toHaveLength(1);
   });
 
+  it("getReportByOrderId hit/miss (F-6)", async () => {
+    const repo = new InMemoryRepository(testEnv());
+    const r = await repo.createReport({ orderId: "acc-rep-1", objectId: "obj-1", category: "coins" });
+    expect((await repo.getReportByOrderId("acc-rep-1"))?.id).toBe(r.id);
+    expect(await repo.getReportByOrderId("nope")).toBeNull();
+  });
+
   it("upserts a profile version and fetches latest", async () => {
     const repo = new InMemoryRepository(testEnv());
     await repo.upsertProfile({ category: "coins", version: 1, json: { category: "coins", version: 1, label: "c", identityKeys: [], captureSlots: [], redFlags: [], corpusSources: [], compKeys: [] } });

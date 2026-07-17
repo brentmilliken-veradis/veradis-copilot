@@ -65,6 +65,37 @@ describe("confirmReport (E7)", () => {
     expect(res.version).toBeNull();
   });
 
+  it("Cleanup 1: a withhold carrying a stray band still withholds (band never validated)", async () => {
+    const repo = new InMemoryRepository();
+    const { reportId } = await seedProvisional(repo, buildCoin2007(1, { provisional: true }));
+    // A 0–0 band on a Verify report would throw for confirm/downgrade — but a
+    // withhold never applies a band, so it must not validate one.
+    const res = await confirmReport(repo, {
+      reportId,
+      curator: "c",
+      credentialClass: "senior_curator",
+      verb: "withheld",
+      valuationBand: { currency: "CAD", lo: 0, hi: 0 },
+    });
+    expect(res.report.status).toBe("withheld");
+    expect(res.version).toBeNull();
+    expect(await repo.listCuratorActions(reportId)).toHaveLength(1);
+  });
+
+  it("Cleanup 1: confirm/downgrade + invalid band still throws with zero curator actions (R-6 intact)", async () => {
+    const repo = new InMemoryRepository();
+    const { reportId } = await seedProvisional(repo, buildCoin2007(1, { provisional: true }));
+    // A 0–0 / inverted band is invalid regardless of the valuation section.
+    await expect(
+      confirmReport(repo, { reportId, curator: "c", credentialClass: "curator", verb: "confirmed", valuationBand: { currency: "CAD", lo: 0, hi: 0 } }),
+    ).rejects.toThrow(/0–0/);
+    await expect(
+      confirmReport(repo, { reportId, curator: "c", credentialClass: "curator", verb: "downgraded", downgradeTo: "silver", valuationBand: { currency: "CAD", lo: 500, hi: 100 } }),
+    ).rejects.toThrow(/lo ≤ hi/);
+    expect(await repo.listCuratorActions(reportId)).toHaveLength(0);
+    expect((await repo.getReport(reportId))?.status).toBe("provisional"); // not sealed
+  });
+
   it("a curator may downgrade the tier (never inflate)", async () => {
     const repo = new InMemoryRepository();
     const gold = buildCoin2007(2, { provisional: true }); // Gold

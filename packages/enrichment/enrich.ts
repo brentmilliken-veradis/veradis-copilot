@@ -24,6 +24,12 @@ import type { SanctionsAdapter } from "@/packages/adapters/sanctions";
 import type { VisionRedFlag } from "@/packages/adapters/vision";
 
 const CORPUS_MATCH_THRESHOLD = 0.35;
+// P2 (fix brief v04): a vision-ADDED value (the owner never declared this key)
+// has no human assertion behind it — only the model's reading. It must clear a
+// STRONGER corpus bar than a declared value before the corpus is allowed to
+// corroborate it; a marginal cosine echo must not credit a model-originated
+// attribute. Declared and vision-changed values keep the ordinary bar.
+const VISION_ADDED_CORPUS_THRESHOLD = 0.6;
 
 // CI scale factor (§7.2) — higher = data dominates the prior (tighter CI).
 // Coins carry the richest machine-readable data (PCGS + Numista APIs, die-match),
@@ -77,13 +83,28 @@ export async function enrich(
   );
 
   // ── Identity ────────────────────────────────────────────────────────────
+  const normv = (v: string): string => v.trim().toLowerCase();
+
+  // R-2 (fix brief v04): only CORROBORATED values may feed custody. Base set =
+  // the owner's unchanged declarations; identity keys that earn Tier-1/corpus
+  // credit are added in the loop below. A value that exists only because
+  // vision changed or added it never reaches the graph cross-ref — F-2 closed
+  // the identity channel, this closes the custody proxy.
+  const corroboratedAttributes: Record<string, string> = {};
+  for (const [k, v] of Object.entries(resolvedAttributes)) {
+    const declaredVal = declaredAttributes[k];
+    if (declaredVal !== undefined && normv(declaredVal) === normv(v)) corroboratedAttributes[k] = v;
+  }
+
   const identity: IdentityCheckInput[] = [];
   for (const idKey of profile.identityKeys) {
     const value = resolvedAttributes[idKey.key];
+    const claimed = declaredAttributes[idKey.key];
     let authorityState: AuthorityState;
     let credit: number;
     let present: boolean;
     let result: CheckOutcome;
+    let note: string | null = null;
     let citation: { name: string; url?: string; retrievalState: "retrieved" | "pending"; tier: 1 | 2 | 4 } | null;
 
     if (!value) {
@@ -91,6 +112,7 @@ export async function enrich(
       credit = 0;
       present = false;
       result = "gap_held_open";
+      note = "attribute not supplied";
       const t1 = adapters.sources.find((a) => a.tier === 1 && a.categories.includes(report.category));
       citation = t1 ? { name: t1.name, retrievalState: "pending", tier: 1 } : null;
     } else {
@@ -102,26 +124,56 @@ export async function enrich(
         present = true;
         result = correctedKeys.has(idKey.key) ? "corrected" : "match";
         citation = { name: resolved.name, url: resolved.url, retrievalState: "retrieved", tier: 1 };
+        corroboratedAttributes[idKey.key] = value; // Tier-1 closed it (R-2)
       } else {
-        // Corpus corroboration (Tier 2–3) — cite, never close.
+        // Corpus corroboration (Tier 2–3) — cite, never close. A vision-added
+        // value (owner never declared this key) must clear the stronger bar.
+        const visionAddedValue = claimed === undefined;
+        const corpusBar = visionAddedValue ? VISION_ADDED_CORPUS_THRESHOLD : CORPUS_MATCH_THRESHOLD;
         const top = await retrieveTopK(repo, adapters.embedder, {
           category: report.category,
           query: `${idKey.key} ${value}`,
           k: 1,
         });
-        if (top.length && top[0].score >= CORPUS_MATCH_THRESHOLD) {
+        if (top.length && top[0].score >= corpusBar) {
           authorityState = "corpus";
           credit = 0.5;
           present = true;
           result = correctedKeys.has(idKey.key) ? "corrected" : "consistent";
           const src = String(top[0].chunk.metadataJson.source ?? "corpus");
           citation = { name: src, retrievalState: "retrieved", tier: 2 };
+          corroboratedAttributes[idKey.key] = value; // corpus corroborated (R-2)
         } else {
-          authorityState = "declared";
-          credit = 0.5;
-          present = true;
-          result = correctedKeys.has(idKey.key) ? "corrected" : "observed";
-          citation = { name: "Owner declaration", retrievalState: "retrieved", tier: 4 };
+          // F-2 (D-2): vision may only downgrade. With neither Tier-1 nor
+          // corpus corroboration, a value that exists only because vision
+          // changed or supplied it is never scored ground truth:
+          //  - vision CHANGED the declaration → assessed conflict, zero credit
+          //    (lowers vs the declared-only 0.5 baseline);
+          //  - vision ADDED a value the owner never declared → treated exactly
+          //    like a missing attribute (cannot lift the score).
+          const visionChanged = claimed !== undefined && normv(claimed) !== normv(value);
+          const visionAdded = claimed === undefined;
+          if (visionChanged) {
+            authorityState = "declared";
+            credit = 0;
+            present = true;
+            result = "corrected";
+            note = "vision-derived value conflicts with the declaration and has no corroborating source — not credited";
+            citation = { name: "Vision (uncorroborated)", retrievalState: "pending", tier: 4 };
+          } else if (visionAdded) {
+            authorityState = "declared";
+            credit = 0;
+            present = false;
+            result = "gap_held_open";
+            note = "vision-derived value has no corroborating source — held open, not credited";
+            citation = { name: "Vision (uncorroborated)", retrievalState: "pending", tier: 4 };
+          } else {
+            authorityState = "declared";
+            credit = 0.5;
+            present = true;
+            result = "observed";
+            citation = { name: "Owner declaration", retrievalState: "retrieved", tier: 4 };
+          }
         }
       }
     }
@@ -142,7 +194,7 @@ export async function enrich(
       result,
       authorityState,
       sourceId: sourceRow?.id ?? null,
-      note: value ? null : "attribute not supplied",
+      note,
     });
     identity.push({ key: idKey.key, weight: idKey.weight, credit, present, authorityState });
   }
@@ -174,10 +226,13 @@ export async function enrich(
   }
 
   // ── Custody (graph cross-ref raises coverage) ────────────────────────────
+  // R-2: the cross-ref sees ONLY corroborated attributes — an uncorroborated
+  // vision value can never lift coverage/eventCount (and so the composite)
+  // through custody. resolvedAttributes stays as-is for display.
   const links = await adapters.graph.crossRef({
     objectId: report.objectId,
     category: report.category,
-    attributes: resolvedAttributes,
+    attributes: corroboratedAttributes,
   });
   const baseCoverage = input.custodyHint?.coverage ?? 0.5;
   const coverage = Math.min(1, baseCoverage + links.reduce((a, l) => a + l.confidence * 0.1, 0));

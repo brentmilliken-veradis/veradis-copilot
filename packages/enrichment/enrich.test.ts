@@ -128,4 +128,70 @@ describe("enrich (E4)", () => {
     expect(res.scoreInputs.scaleFactor).toBe(10);
     expect(res.scoreInputs.alrEnabled).toBe(false);
   });
+
+  // P2 (fix brief v04): a vision-ADDED value (owner never declared the key) must
+  // clear a STRONGER corpus bar (0.6) than a declared value (0.35). A fixed-
+  // cosine embedder pins a corpus match at 0.5 — between the two bars.
+  const fixedCosineAdapters = (): EnrichAdapters => ({
+    sources: [pcgsAdapter(), numistaAdapter()],
+    embedder: { name: "embedding:fixed", dim: 2, embed: async (texts) => texts.map(() => [1, 0]) },
+    graph: new StubGraphAdapter(),
+    sanctions: new StubSanctionsAdapter(),
+  });
+
+  async function seedCorpusAt(repo: InMemoryRepository, cosine: number): Promise<void> {
+    const doc = await repo.addCorpusDocument({ category: "coins", source: "acsearch.info (die-match)", url: null, licence: null, fetchedAt: "2026-07-13T00:00:00Z", sha256: "d" });
+    // query embeds to [1,0]; a chunk [cosine, sqrt(1-cosine^2)] gives exactly `cosine`.
+    await repo.addCorpusChunk({
+      corpusDocumentId: doc.id,
+      text: "variety proof",
+      embedding: [cosine, Math.sqrt(1 - cosine * cosine)],
+      metadataJson: { source: "acsearch.info (die-match)" },
+    });
+  }
+
+  it("P2: a DECLARED value at a mid corpus score (0.5) is corroborated", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    await seedCorpusAt(repo, 0.5);
+    // variety declared AND resolved → the ordinary 0.35 bar applies.
+    const res = await enrich(repo, fixedCosineAdapters(), input(report, RESOLVED));
+    const variety = res.scoreInputs.identity.find((i) => i.key === "variety");
+    expect(variety).toMatchObject({ authorityState: "corpus", credit: 0.5, present: true });
+  });
+
+  it("P2: a VISION-ADDED value at the same score (0.5) is held open — below the 0.6 bar", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    await seedCorpusAt(repo, 0.5);
+    // variety is in resolved (vision added it) but NOT declared.
+    const { variety, ...declared } = RESOLVED;
+    const res = await enrich(repo, fixedCosineAdapters(), {
+      report,
+      profile: loadProfile("coins"),
+      declaredAttributes: declared,
+      resolvedAttributes: { ...declared, variety },
+      redFlags: [],
+    });
+    const varietyInput = res.scoreInputs.identity.find((i) => i.key === "variety");
+    expect(varietyInput).toMatchObject({ credit: 0, present: false });
+    const checks = await repo.listChecks(report.id);
+    expect(checks.find((c) => c.key === "variety")?.note).toMatch(/no corroborating source — held open/);
+  });
+
+  it("P2: a VISION-ADDED value that clears the STRONGER bar (0.7) is corroborated", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    await seedCorpusAt(repo, 0.7);
+    const { variety, ...declared } = RESOLVED;
+    const res = await enrich(repo, fixedCosineAdapters(), {
+      report,
+      profile: loadProfile("coins"),
+      declaredAttributes: declared,
+      resolvedAttributes: { ...declared, variety },
+      redFlags: [],
+    });
+    const varietyInput = res.scoreInputs.identity.find((i) => i.key === "variety");
+    expect(varietyInput).toMatchObject({ authorityState: "corpus", credit: 0.5, present: true });
+  });
 });

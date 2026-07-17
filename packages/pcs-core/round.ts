@@ -10,7 +10,7 @@ export function roundHalfEven2(x: number): number {
   const neg = x < 0;
   const [m, e] = frexpBig(Math.abs(x));
   // exact value = m·2^e; scale by 100 and round to integer, ties to even.
-  let num = m * 100n;
+  const num = m * 100n;
   let scaled: bigint;
   if (e >= 0) {
     scaled = num << BigInt(e);

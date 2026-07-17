@@ -1,0 +1,41 @@
+{
+  "category": "medals",
+  "version": 2,
+  "calibration": "calibrated",
+  "label": "Medals & militaria (UK / Commonwealth) — full profile (sources thin-live: rolls/gazette lookups not yet wired; calibration pending)",
+  "identityKeys": [
+    { "key": "naming", "label": "Rim naming (rank/name/unit)", "weight": 0.35 },
+    { "key": "rank", "label": "Rank", "weight": 0.1 },
+    { "key": "unit", "label": "Regiment / unit", "weight": 0.2 },
+    { "key": "campaign", "label": "Campaign / award", "weight": 0.2 },
+    { "key": "gazette", "label": "Gazette entry", "weight": 0.15 }
+  ],
+  "identityNeverKeys": ["serial"],
+  "captureSlots": [
+    { "slotId": "obverse", "label": "Obverse (per medal)", "guidance": "Each medal, obverse, square-on.", "requiredFor": "identity", "core": true },
+    { "slotId": "reverse", "label": "Reverse (per medal)", "guidance": "Each medal, reverse, square-on.", "requiredFor": "identity", "core": true },
+    { "slotId": "suspension_naming", "label": "Suspension / naming", "guidance": "Rim naming in raked light, legible end to end.", "requiredFor": "identity", "core": true, "unlocks": ["roll_match"] },
+    { "slotId": "naming_macro", "label": "Naming macro", "guidance": "Macro of the impressed naming — font, spacing, depth.", "requiredFor": "material", "core": true },
+    { "slotId": "ribbon_detail", "label": "Ribbon / suspension detail", "guidance": "Ribbon weave and suspension claw, close up.", "requiredFor": "material", "core": false },
+    { "slotId": "group_layout", "label": "Group layout", "guidance": "Full group as mounted, in wearing order.", "requiredFor": "custody", "core": false },
+    { "slotId": "documents", "label": "Documents", "guidance": "Certificates, service papers, box of issue, transmission slips.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "renamed", "label": "Renamed", "description": "Original naming erased and re-cut to a different recipient." },
+    { "key": "copy_striking", "label": "Copy striking", "description": "Later restrike / copy rather than an original issue." },
+    { "key": "wrong_naming_style", "label": "Wrong naming style", "description": "Naming font/impressing inconsistent with the issuing period." },
+    { "key": "wrong_ribbon", "label": "Wrong ribbon", "description": "Ribbon inconsistent with the award (replacement is common, but flag for disclosure)." },
+    { "key": "remounted_group", "label": "Remounted / assembled group", "description": "Group assembled from separate medals rather than as awarded to one recipient." }
+  ],
+  "corpusSources": [
+    { "name": "The London Gazette", "tier": 1, "role": "ground_truth", "url": "https://www.thegazette.co.uk" },
+    { "name": "TNA medal rolls (WO 100) and index cards (WO 372)", "tier": 1, "role": "ground_truth", "url": "https://discovery.nationalarchives.gov.uk" },
+    { "name": "Library and Archives Canada service files", "tier": 1, "role": "ground_truth", "url": "https://library-archives.canada.ca" },
+    { "name": "Veterans Affairs Canada (VAC) Virtual War Memorial", "tier": 1, "role": "ground_truth", "url": "https://www.veterans.gc.ca" },
+    { "name": "CWGC", "tier": 2, "role": "corroboration", "url": "https://www.cwgc.org" },
+    { "name": "Noonans (DNW) archive", "tier": 2, "role": "corroboration", "url": "https://www.noonans.co.uk" },
+    { "name": "British Medal Forum", "tier": 4, "role": "cite_only", "url": "https://www.britishmedalforum.com" }
+  ],
+  "compKeys": ["recipient_class", "campaign", "group_completeness", "condition"],
+  "materialSlotClass": "naming_and_strike"
+}

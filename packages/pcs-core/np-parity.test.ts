@@ -47,7 +47,12 @@ describe("NumPy bit-parity (layered)", () => {
     });
   }
 
-  for (const [key, c] of Object.entries(VEC.cases) as [string, any][]) {
+  interface ParityCase {
+    seed: string;
+    posteriors: Record<string, [number, number]>;
+    beta_stream: number[];
+  }
+  for (const [key, c] of Object.entries(VEC.cases) as [string, ParityCase][]) {
     it(`§${key} interleaved beta stream matches`, () => {
       const rng = new Pcg64(BigInt(c.seed));
       const quads = ["identity", "custody", "material", "risk"];

@@ -30,7 +30,7 @@ export async function sendReceived(
     "",
     `Order reference: ${order.id}`,
     "",
-    "veradis.ai — AI generates. veradis verifies.",
+    "veradis — AI generates. veradis verifies.",
   ].join("\n");
   const { providerId } = await emailer.send({ to: order.email, subject, text });
   await repo.recordEmail({ orderId: order.id, reportId, kind: "received", to: order.email, subject, providerId });
@@ -75,7 +75,7 @@ export async function sendDefinitive(
     "",
     "The report states what the evidence supports and what it does not. Where the data is thin, the confidence interval says so — that is by design.",
     "",
-    "veradis.ai — AI generates. veradis verifies.",
+    "veradis — AI generates. veradis verifies.",
   ].join("\n");
   const { providerId } = await emailer.send({ to: order.email, subject, text });
   await repo.recordEmail({ orderId: order.id, reportId, kind: "definitive", to: order.email, subject, providerId });

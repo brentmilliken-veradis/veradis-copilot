@@ -40,6 +40,11 @@ export interface Repository {
   // reports
   createReport(input: NewReport): Promise<Report>;
   getReport(id: string): Promise<Report | null>;
+  /** Bounded lookup by order id (F-6) — the poller's delivery-retry path must
+   *  not scan the table (PostgREST silently caps list responses at 1000). */
+  getReportByOrderId(orderId: string): Promise<Report | null>;
+  /** Bounded status query (R-5) — feeds the curator-email sweep. */
+  listReportsByStatus(status: ReportStatus, limit: number): Promise<Report[]>;
   updateReport(
     id: string,
     patch: Partial<Pick<Report, "status" | "currentVersion" | "objectId" | "category">>,
@@ -84,17 +89,31 @@ export interface Repository {
   addCorpusChunk(input: NewCorpusChunk): Promise<CorpusChunk>;
   listCorpusChunks(category: Category): Promise<CorpusChunk[]>;
 
-  // orders (Tally intake) — tallySubmissionId is the webhook dedupe key
+  // orders — tallySubmissionId is the dedupe key; the id PK is the atomic
+  // claim (createOrder throws DuplicateOrderError on an existing id).
   createOrder(input: NewOrder): Promise<Order>;
   getOrder(orderId: string): Promise<Order | null>;
   getOrderByTallySubmission(submissionId: string): Promise<Order | null>;
+  updateOrder(
+    orderId: string,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+  ): Promise<Order>;
+  /** R-3: compare-and-swap reclaim of a stale 'producing' claim. Takes the row
+   *  ONLY when productionState is still 'producing' AND (claimedAt, attempts)
+   *  match the observed values — bumping attempts and stamping the new claim.
+   *  Returns the reclaimed order, or null when another tick won the race. */
+  reclaimStaleOrder(
+    orderId: string,
+    expected: { claimedAt: string | null; attempts: number },
+    newClaimedAt: string,
+  ): Promise<Order | null>;
 
   // outbound email log (EMAIL A/B/C audit trail)
   recordEmail(input: NewEmailRecord): Promise<EmailRecord>;
   listEmails(orderId: string): Promise<EmailRecord[]>;
 }
 
-/** A paid Tally submission — the commercial side of a report. */
+/** A paid order — the commercial side of a report (Tally or store queue). */
 export interface Order {
   id: string;
   tallySubmissionId: string;
@@ -103,9 +122,28 @@ export interface Order {
   category: Category;
   sku: "verify" | "appraise";
   createdAt: string;
+  /** F-5a production lifecycle: the order row IS the poller's atomic claim.
+   *  producing = claimed/in flight · produced = pipeline succeeded ·
+   *  failed = terminal after max attempts (surfaced, never retried). */
+  productionState: "producing" | "produced" | "failed";
+  attempts: number;
+  claimedAt: string | null;
+  lastError: string | null;
 }
 
-export type NewOrder = Omit<Order, "createdAt">;
+export type NewOrder = Omit<Order, "createdAt" | "productionState" | "attempts" | "claimedAt" | "lastError"> & {
+  productionState?: Order["productionState"];
+  attempts?: number;
+  claimedAt?: string | null;
+};
+
+/** createOrder on an existing id — the losing side of an atomic claim. */
+export class DuplicateOrderError extends Error {
+  constructor(orderId: string) {
+    super(`order ${orderId} already exists`);
+    this.name = "DuplicateOrderError";
+  }
+}
 
 export type EmailKind = "received" | "curator_review" | "definitive";
 

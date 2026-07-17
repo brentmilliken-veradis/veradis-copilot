@@ -1,0 +1,37 @@
+{
+  "category": "watches",
+  "version": 1,
+  "calibration": "provisional",
+  "label": "Watches (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "identityKeys": [
+    { "key": "brand", "label": "Brand / maker", "weight": 0.2 },
+    { "key": "reference", "label": "Model / reference number", "weight": 0.25 },
+    { "key": "serial_number", "label": "Serial number", "weight": 0.2 },
+    { "key": "movement_calibre", "label": "Movement calibre", "weight": 0.2 },
+    { "key": "dial_configuration", "label": "Dial configuration", "weight": 0.15 }
+  ],
+  "captureSlots": [
+    { "slotId": "dial_front", "label": "Dial (front)", "guidance": "Full dial, square-on, even light, no reflections.", "requiredFor": "identity", "core": true },
+    { "slotId": "caseback", "label": "Caseback", "guidance": "Caseback engravings and hallmarks, raked light.", "requiredFor": "identity", "core": true },
+    { "slotId": "serial_macro", "label": "Serial / reference macro", "guidance": "Macro of the serial and reference numbers (between lugs or caseback).", "requiredFor": "identity", "core": true, "unlocks": ["serial_lookup"] },
+    { "slotId": "movement", "label": "Movement", "guidance": "Movement with the caseback removed, if safely possible.", "requiredFor": "material", "core": false, "unlocks": ["calibre_attribution"] },
+    { "slotId": "clasp_buckle", "label": "Clasp / buckle", "guidance": "Clasp signature and code.", "requiredFor": "material", "core": false },
+    { "slotId": "papers_warranty", "label": "Papers / warranty card", "guidance": "Warranty card, chronometer certificate, service papers.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "redial", "label": "Redial", "description": "Refinished or reprinted dial presented as original." },
+    { "key": "franken", "label": "Frankenwatch", "description": "Mismatched case, dial, and movement assembled from different watches." },
+    { "key": "altered_serial", "label": "Altered serial", "description": "Re-stamped or erased serial / reference numbers." },
+    { "key": "fake_movement", "label": "Non-genuine movement", "description": "Cloned or substituted movement inconsistent with the claimed calibre." },
+    { "key": "overpolished_case", "label": "Over-polished case", "description": "Lost lug definition and soft hallmarks from aggressive polishing." }
+  ],
+  "corpusSources": [
+    { "name": "The Watch Register", "tier": 1, "role": "ground_truth", "url": "https://www.thewatchregister.com" },
+    { "name": "Brand archive extracts (e.g. Omega certificate service)", "tier": 1, "role": "ground_truth" },
+    { "name": "WatchCharts market data", "tier": 2, "role": "corroboration", "url": "https://watchcharts.com" },
+    { "name": "Chrono24 listings archive", "tier": 2, "role": "corroboration", "url": "https://www.chrono24.com" },
+    { "name": "Collector forums (Omega Forums, Rolex Forums)", "tier": 4, "role": "cite_only" }
+  ],
+  "compKeys": ["brand", "reference", "year", "condition", "box_papers"],
+  "materialSlotClass": "case_dial_movement"
+}
