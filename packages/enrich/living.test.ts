@@ -202,6 +202,29 @@ describe("runEnrichmentJobs", () => {
     expect(accounts.events.filter((e) => e.type === "value_changed")).toHaveLength(1);
   });
 
+  it("F-11: mixed-currency appraisals subtotal the dominant currency only, basis partial + note", async () => {
+    const accounts = new FakeAccounts();
+    accounts.objects.set("a", obj("a"));
+    accounts.objects.set("b", obj("b"));
+    accounts.objects.set("c", obj("c"));
+    accounts.appraisals.push(
+      { object_id: "a", valuation: "CAD 100–200" },
+      { object_id: "b", valuation: "CAD 50–80" },
+      { object_id: "c", valuation: "USD 1000–2000" },
+    );
+    accounts.jobs.push({ id: "job-1", user_id: "user-1", object_id: null, kind: "revalue", status: "queued", detail: null });
+
+    await runEnrichmentJobs(deps(accounts));
+
+    // Dominant currency (CAD, 2 bands) subtotalled; USD never added in.
+    expect(accounts.valuations).toEqual([
+      { user_id: "user-1", low: 150, high: 280, currency: "CAD", basis: "partial", updated_at: NOW },
+    ]);
+    const event = accounts.events.find((e) => e.type === "value_changed");
+    expect(event?.body).toContain("USD");
+    expect(accounts.jobs[0].detail).toContain("excluded currencies: USD");
+  });
+
   it("revalue with a partial appraisal set writes basis=partial", async () => {
     const accounts = new FakeAccounts();
     accounts.objects.set("a", obj("a"));
@@ -292,7 +315,7 @@ describe("runEnrichmentJobs", () => {
     expect(accounts.reportPatches).toHaveLength(0); // their report row untouched
   });
 
-  it("relink scoped to one object only links from that object", async () => {
+  it("F-10: relink on a NON-HEAD object links it to every other group member", async () => {
     const accounts = new FakeAccounts();
     accounts.objects.set("a", obj("a", { maker: "Omega" }));
     accounts.objects.set("b", obj("b", { maker: "Omega" }));
@@ -301,6 +324,7 @@ describe("runEnrichmentJobs", () => {
 
     await runEnrichmentJobs(deps(accounts));
     expect(accounts.links.every((l) => l.from_object === "b")).toBe(true);
-    expect(accounts.links.length).toBeGreaterThan(0);
+    // Both pairs, including the b→a (head) pair the old iteration missed.
+    expect(accounts.links.map((l) => l.to_object).sort()).toEqual(["a", "c"]);
   });
 });

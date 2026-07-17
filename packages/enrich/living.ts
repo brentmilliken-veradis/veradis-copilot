@@ -9,6 +9,13 @@
 //   as such), never new facts — and never a number;
 // - the collection valuation is only ever rolled up from DELIVERED appraisal
 //   bands; with none, nothing is written (no invented value).
+//
+// F-9 contract: enrichment_events title/body are PLAIN TEXT — the account
+// app's feed escapes them (collections.html feedItem → esc()). Owner-supplied
+// strings (object titles, makers) are interpolated un-escaped here BY DESIGN;
+// escaping belongs at the render boundary, and doing it here would
+// double-encode. objects.narrative_html is the one HTML field, and its
+// interpolated values go through esc() below.
 
 import type {
   AccountsJobRow,
@@ -85,11 +92,19 @@ async function writeLinks(deps: EnrichDeps, userId: string, objects: AccountsObj
   let written = 0;
   for (const group of byMaker.values()) {
     if (group.length < 2) continue;
-    const [head, ...rest] = group;
-    for (const other of rest) {
-      const from = onlyFrom ? group.find((g) => g.id === onlyFrom) : head;
-      if (!from || other.id === from.id) continue;
-      if (onlyFrom && from.id !== onlyFrom) continue;
+    // F-10: for a scoped relink, pair the relinked object with EVERY other
+    // group member (the old head-based iteration missed the onlyFrom→head
+    // pair whenever the relinked object wasn't the group head).
+    const pairs: [AccountsObjectRow, AccountsObjectRow][] = [];
+    if (onlyFrom) {
+      const from = group.find((g) => g.id === onlyFrom);
+      if (!from) continue;
+      for (const other of group) if (other.id !== from.id) pairs.push([from, other]);
+    } else {
+      const [head, ...rest] = group;
+      for (const other of rest) pairs.push([head, other]);
+    }
+    for (const [from, other] of pairs) {
       await deps.accounts.insertLink({
         user_id: userId,
         from_object: from.id,
@@ -147,26 +162,44 @@ async function writeNarrative(deps: EnrichDeps, userId: string, obj: AccountsObj
   });
 }
 
-/** Roll delivered appraisal bands up into collection_valuation. Returns what
- *  was written, or null when there is nothing honest to write. */
+/** Roll delivered appraisal bands up into collection_valuation. F-11: never
+ *  sum across currencies — the dominant currency (most bands; ties → first
+ *  seen) is subtotalled; other currencies are excluded, named in the feed
+ *  event, and force basis 'partial' (no FX conversion without a rate source).
+ *  Returns what was written + the excluded currencies, or null when there is
+ *  nothing honest to write. */
 async function writeValuation(
   deps: EnrichDeps,
   userId: string,
   objects: AccountsObjectRow[],
-): Promise<AccountsValuationUpsert | null> {
+): Promise<{ v: AccountsValuationUpsert; excluded: string[] } | null> {
   const appraisals = await deps.accounts.listDeliveredAppraisals(userId);
   const bands = appraisals
     .map((a) => ({ objectId: a.object_id, band: parseValuationBand(a.valuation) }))
     .filter((a): a is { objectId: string; band: NonNullable<ReturnType<typeof parseValuationBand>> } => !!a.band);
   if (!bands.length) return null; // no appraised values → no invented number
 
-  const appraisedObjects = new Set(bands.map((b) => b.objectId));
+  const byCurrency = new Map<string, typeof bands>();
+  for (const b of bands) {
+    byCurrency.set(b.band.currency, [...(byCurrency.get(b.band.currency) ?? []), b]);
+  }
+  let dominant = bands[0].band.currency;
+  for (const [cur, group] of byCurrency) {
+    if (group.length > (byCurrency.get(dominant)?.length ?? 0)) dominant = cur;
+  }
+  const counted = byCurrency.get(dominant)!;
+  const excluded = [...byCurrency.keys()].filter((c) => c !== dominant);
+
+  const appraisedObjects = new Set(counted.map((b) => b.objectId));
   const v: AccountsValuationUpsert = {
     user_id: userId,
-    low: bands.reduce((a, b) => a + b.band.lo, 0),
-    high: bands.reduce((a, b) => a + b.band.hi, 0),
-    currency: bands[0].band.currency,
-    basis: objects.length > 0 && objects.every((o) => appraisedObjects.has(o.id)) ? "full" : "partial",
+    low: counted.reduce((a, b) => a + b.band.lo, 0),
+    high: counted.reduce((a, b) => a + b.band.hi, 0),
+    currency: dominant,
+    basis:
+      excluded.length === 0 && objects.length > 0 && objects.every((o) => appraisedObjects.has(o.id))
+        ? "full"
+        : "partial",
     updated_at: nowIso(deps),
   };
   await deps.accounts.upsertValuation(v);
@@ -174,10 +207,13 @@ async function writeValuation(
     user_id: userId,
     type: "value_changed",
     title: "Value updated.",
-    body: "Your indicative collection value has been refreshed.",
+    body:
+      excluded.length === 0
+        ? "Your indicative collection value has been refreshed."
+        : `Your indicative collection value has been refreshed. Appraisals in ${excluded.join(", ")} are held separately — cross-currency totals need a rate source.`,
     action_url: "/collections",
   });
-  return v;
+  return { v, excluded };
 }
 
 // ── per-kind handlers ───────────────────────────────────────────────────────
@@ -191,8 +227,13 @@ async function handleFirstPass(deps: EnrichDeps, job: AccountsJobRow): Promise<s
   return [
     `${links} link(s)`,
     `${objects.length} narrative(s)`,
-    valuation ? `valuation ${valuation.currency} ${valuation.low}–${valuation.high} (${valuation.basis})` : "no appraised values yet — valuation not written",
+    valuation ? valuationDetail(valuation) : "no appraised values yet — valuation not written",
   ].join(" · ");
+}
+
+function valuationDetail({ v, excluded }: { v: AccountsValuationUpsert; excluded: string[] }): string {
+  const base = `valuation ${v.currency} ${v.low}–${v.high} (${v.basis})`;
+  return excluded.length ? `${base}; excluded currencies: ${excluded.join(", ")}` : base;
 }
 
 async function handleReverify(deps: EnrichDeps, job: AccountsJobRow): Promise<string> {
@@ -236,9 +277,7 @@ async function handleRelink(deps: EnrichDeps, job: AccountsJobRow): Promise<stri
 async function handleRevalue(deps: EnrichDeps, job: AccountsJobRow): Promise<string> {
   const objects = await deps.accounts.listObjects(job.user_id);
   const valuation = await writeValuation(deps, job.user_id, objects);
-  return valuation
-    ? `valuation ${valuation.currency} ${valuation.low}–${valuation.high} (${valuation.basis})`
-    : "no appraised values yet — nothing written";
+  return valuation ? valuationDetail(valuation) : "no appraised values yet — nothing written";
 }
 
 async function handleNarrative(deps: EnrichDeps, job: AccountsJobRow): Promise<string> {

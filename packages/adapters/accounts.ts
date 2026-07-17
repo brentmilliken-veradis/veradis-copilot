@@ -57,7 +57,14 @@ export interface AccountsJobRow {
   detail: string | null;
 }
 
-/** enrichment_events insert shape (types per accounts migration 0002). */
+/** enrichment_events insert shape (types per accounts migration 0002).
+ *
+ *  F-9 CONTRACT (verified against the account app, collections.html feedItem:
+ *  both title and body render through esc() as text): event `title`/`body`
+ *  are PLAIN TEXT. The engine deliberately does NOT HTML-escape them —
+ *  escaping into a text field double-encodes. If the account-template ever
+ *  renders the feed as HTML, escaping must move here — raise it with them
+ *  before any such change. */
 export interface AccountsEventInsert {
   user_id: string;
   object_id?: string | null;
