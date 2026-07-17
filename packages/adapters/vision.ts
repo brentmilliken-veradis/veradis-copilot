@@ -7,6 +7,7 @@
 
 import type { Category, C2paState } from "@/packages/pcs-types";
 import { ALL_CATEGORIES } from "@/packages/pcs-types";
+import { loadProfile, ProfileValidationError } from "@/packages/profiles/loader";
 import type { Storage } from "./storage";
 import { markStubbed } from "./stub-registry";
 
@@ -154,6 +155,100 @@ function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
+// ---- Image sizing for the vision call (fix brief 2026-07-17) ----
+// iPhone JPEGs are ~3–5 MB each; base64 inflates ~33%, so a photo-heavy object
+// blows past Anthropic's ~32 MB request-body limit → HTTP 413. We downscale a
+// THROWAWAY copy of each image to ≤1568 px long edge (Anthropic's own server
+// cap) and re-encode JPEG before base64, then bound the total payload. The
+// STORED evidence bytes and their SHA-256 are never touched — this copy is
+// sent to the LLM only.
+
+/** Anthropic downscales anything over this long edge server-side anyway. */
+export const VISION_MAX_LONG_EDGE = 1568;
+const VISION_JPEG_QUALITY = 80;
+/** Total base64 payload budget — well under Anthropic's ~32 MB request limit. */
+export const VISION_TOTAL_PAYLOAD_BUDGET = 20 * 1024 * 1024;
+/** Anthropic caps a single image at 5 MB base64; stay clear of the edge. */
+export const VISION_PER_IMAGE_MAX = Math.floor(4.5 * 1024 * 1024);
+
+/** Downscale a THROWAWAY copy for the vision call: decode → if the long edge
+ *  exceeds VISION_MAX_LONG_EDGE, resize to it (aspect preserved) → re-encode
+ *  JPEG. Pure-JS (jimp) — no native binary, matching the repo's Vercel-safe
+ *  constraint. On a decode failure the original bytes are returned unchanged;
+ *  the per-image guard still keeps an over-limit image from being sent. */
+export async function downscaleForVision(bytes: Uint8Array): Promise<Uint8Array> {
+  const { Jimp } = await import("jimp");
+  let img;
+  try {
+    img = await Jimp.read(Buffer.from(bytes));
+  } catch {
+    return bytes; // undecodable — leave as-is; the payload cap guards size
+  }
+  const longEdge = Math.max(img.width, img.height);
+  if (longEdge > VISION_MAX_LONG_EDGE) {
+    // Resize by the long edge only; jimp preserves aspect for the other edge.
+    if (img.width >= img.height) img.resize({ w: VISION_MAX_LONG_EDGE });
+    else img.resize({ h: VISION_MAX_LONG_EDGE });
+  }
+  const out = await img.getBuffer("image/jpeg", { quality: VISION_JPEG_QUALITY });
+  return new Uint8Array(out);
+}
+
+export interface VisionImage {
+  slot: string;
+  core: boolean;
+  mediaType: ImageMediaType;
+  /** base64-encoded, downscaled bytes. */
+  base64: string;
+}
+
+export interface PayloadSelection {
+  included: VisionImage[];
+  /** Slots left out, with why — logged by the caller (no silent truncation). */
+  dropped: { slot: string; reason: "oversized" | "budget" }[];
+}
+
+/** Choose which images fit the payload budget: core capture slots first (they
+ *  carry the identity signal), then the rest in order, filling the byte budget.
+ *  A single image over the per-image cap is skipped. Pure + deterministic. */
+export function selectImagesForPayload(
+  images: VisionImage[],
+  budget = VISION_TOTAL_PAYLOAD_BUDGET,
+  perImageMax = VISION_PER_IMAGE_MAX,
+): PayloadSelection {
+  // Stable priority: core slots first, original order preserved within each group.
+  const ordered = [...images.filter((i) => i.core), ...images.filter((i) => !i.core)];
+  const included: VisionImage[] = [];
+  const dropped: PayloadSelection["dropped"] = [];
+  let total = 0;
+  for (const img of ordered) {
+    const size = img.base64.length;
+    if (size > perImageMax) {
+      dropped.push({ slot: img.slot, reason: "oversized" });
+      continue;
+    }
+    if (total + size > budget) {
+      dropped.push({ slot: img.slot, reason: "budget" });
+      continue;
+    }
+    included.push(img);
+    total += size;
+  }
+  return { included, dropped };
+}
+
+/** Core capture-slot ids for a category (empty on any profile-load failure — a
+ *  missing profile must not crash the vision call; images just stay un-prioritised). */
+function coreSlotIds(category: Category): Set<string> {
+  try {
+    const profile = loadProfile(category);
+    return new Set(profile.captureSlots.filter((s) => s.core).map((s) => s.slotId));
+  } catch (e) {
+    if (!(e instanceof ProfileValidationError)) throw e;
+    return new Set();
+  }
+}
+
 type ClaudeContentBlock =
   | { type: "text"; text: string }
   | { type: "image"; source: { type: "base64"; media_type: ImageMediaType; data: string } };
@@ -175,19 +270,38 @@ export class ClaudeVisionAdapter implements VisionAdapter {
       req.evidence.map((e) => [e.slot, "absent" as C2paState]),
     );
 
-    const content: ClaudeContentBlock[] = [];
+    // Downscale a throwaway copy of each image (≤1568 px, JPEG) and base64-
+    // encode it — the STORED bytes/SHA-256 are never touched. Then bound the
+    // total payload so a photo-heavy object can never 413.
+    const core = coreSlotIds(req.category);
+    const images: VisionImage[] = [];
     for (const e of req.evidence) {
       const bytes = await this.storage.get(e.storagePath);
       if (!bytes) continue; // missing blob — analyse what we have
-      content.push({ type: "text", text: `Capture slot: ${e.slot}` });
-      content.push({
-        type: "image",
-        source: { type: "base64", media_type: sniffImageMediaType(bytes), data: toBase64(bytes) },
-      });
+      const scaled = await downscaleForVision(bytes);
+      // The downscale re-encodes JPEG; on decode failure it returns the original
+      // bytes, so sniff the copy we actually send rather than assuming JPEG.
+      images.push({ slot: e.slot, core: core.has(e.slot), mediaType: sniffImageMediaType(scaled), base64: toBase64(scaled) });
     }
-    // Nothing to look at → behave like the stub (echo the declaration).
-    if (!content.length) return new StubVisionAdapter().analyze(req);
 
+    const { included, dropped } = selectImagesForPayload(images);
+    if (dropped.length) {
+      // Operating rule: no silent truncation — a bounded set must be logged.
+      console.warn(
+        `vision:claude — payload cap dropped ${dropped.length} image(s): ${dropped
+          .map((d) => `${d.slot} (${d.reason})`)
+          .join(", ")}`,
+      );
+    }
+
+    // Nothing to look at → behave like the stub (echo the declaration).
+    if (!included.length) return new StubVisionAdapter().analyze(req);
+
+    const content: ClaudeContentBlock[] = [];
+    for (const img of included) {
+      content.push({ type: "text", text: `Capture slot: ${img.slot}` });
+      content.push({ type: "image", source: { type: "base64", media_type: img.mediaType, data: img.base64 } });
+    }
     content.push({ type: "text", text: visionUserText(req) });
 
     const res = await fetch(ANTHROPIC_URL, {
