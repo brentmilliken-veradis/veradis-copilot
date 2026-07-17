@@ -58,10 +58,17 @@ export async function deliverReport(
   const val = snapshot.valuation;
   const hasBand =
     val && val.fmvLo !== undefined && val.fmvHi !== undefined && !(val.fmvLo === 0 && val.fmvHi === 0);
+  // R-4 (COORDINATE): a capped report (uncalibrated category / vision-only
+  // re-route) must not put a bare confident number on the account card — the
+  // structured pcs_score is withheld; the HTML file still carries the Flagged
+  // verdict, composite/CI, and the 'not yet calibrated' line. If the
+  // account-template prefers a cap flag alongside the number, that lands on
+  // their schema — coordinate before changing this to anything but omission.
+  const capped = snapshot.capReason !== undefined;
   await accounts.updateReport(row.id, {
     status: "delivered",
     file_path: filePath,
-    pcs_score: version.composite != null ? Math.round(version.composite) : undefined,
+    pcs_score: !capped && version.composite != null ? Math.round(version.composite) : undefined,
     valuation: hasBand ? `${val.currency} ${val.fmvLo}–${val.fmvHi}` : undefined,
     delivered_at: now(),
   });

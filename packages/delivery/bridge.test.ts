@@ -80,6 +80,35 @@ describe("deliverReport", () => {
     expect(typeof patch.pcs_score).toBe("number");
   });
 
+  it("R-4: a capped report's delivery patch carries NO bare pcs_score (uncapped unchanged)", async () => {
+    const patches: { patch: Record<string, unknown> }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("/rest/v1/reports?") && init?.method === "PATCH") {
+          patches.push({ patch: JSON.parse(init.body as string) });
+        }
+        if (url.includes("/rest/v1/reports?") && (!init || !init.method)) {
+          return new Response(JSON.stringify([accountsRow]), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const client = new VeradisAccountsClient(ACCOUNTS_URL, "key");
+
+    // Capped snapshot (uncalibrated category) → no structured score crosses.
+    const cappedVersion = version();
+    cappedVersion.snapshotJson = { ...cappedVersion.snapshotJson, capReason: "uncalibrated_category" };
+    const cappedOut = await deliverReport(client, copilotReport(), cappedVersion, () => NOW);
+    expect(cappedOut.delivered).toBe(true);
+    expect(patches[0].patch.pcs_score).toBeUndefined();
+    expect(patches[0].patch.status).toBe("delivered"); // file still delivers
+
+    // Uncapped → pcs_score as today.
+    await deliverReport(client, copilotReport(), version(), () => NOW);
+    expect(typeof patches[1].patch.pcs_score).toBe("number");
+  });
+
   it("does nothing without an accounts client (stub-flagged)", async () => {
     const out = await deliverReport(null, copilotReport(), version());
     expect(out.delivered).toBe(false);
