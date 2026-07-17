@@ -249,6 +249,25 @@ describe("runEnrichmentJobs", () => {
     expect(accounts.jobs[0].detail).toMatch(/no in_production reports row/);
   });
 
+  it("F-4: reverify and narrative jobs on another tenant's object fail with no writes", async () => {
+    const accounts = new FakeAccounts();
+    accounts.objects.set("theirs", obj("theirs", { user_id: "user-2", photo_paths: ["user-2/p.jpg"] }));
+    accounts.photos.set("user-2/p.jpg", JPEG);
+    accounts.queue.push({ id: "rep-x", user_id: "user-2", object_id: "theirs", type: "verify", status: "in_production" });
+    accounts.jobs.push(
+      { id: "job-1", user_id: "user-1", object_id: "theirs", kind: "reverify", status: "queued", detail: null },
+      { id: "job-2", user_id: "user-1", object_id: "theirs", kind: "narrative", status: "queued", detail: null },
+    );
+
+    const summary = await runEnrichmentJobs(deps(accounts));
+
+    expect(summary).toMatchObject({ polled: 2, done: 0, failed: 2 });
+    for (const j of accounts.jobs) expect(j.detail).toMatch(/object\/owner mismatch/);
+    expect(accounts.objectPatches).toHaveLength(0);
+    expect(accounts.events).toHaveLength(0);
+    expect(accounts.reportPatches).toHaveLength(0); // their report row untouched
+  });
+
   it("relink scoped to one object only links from that object", async () => {
     const accounts = new FakeAccounts();
     accounts.objects.set("a", obj("a", { maker: "Omega" }));

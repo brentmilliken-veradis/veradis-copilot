@@ -193,9 +193,15 @@ async function handleFirstPass(deps: EnrichDeps, job: AccountsJobRow): Promise<s
 
 async function handleReverify(deps: EnrichDeps, job: AccountsJobRow): Promise<string> {
   if (!job.object_id) throw new Error("reverify job has no object_id");
+  // F-4: the job's object must belong to the job's user.
+  const owned = await deps.accounts.getObject(job.object_id);
+  if (!owned || owned.user_id !== job.user_id) throw new Error("object/owner mismatch — nothing re-verified");
   // The reverify endpoint pre-inserted the in_production reports row; run it
   // through the same producer the report poller uses (dedupe included).
-  const rows = await deps.accounts.listInProductionReports(job.object_id);
+  // F-4: only rows owned by the job's user are eligible.
+  const rows = (await deps.accounts.listInProductionReports(job.object_id)).filter(
+    (r) => r.user_id === job.user_id,
+  );
   if (!rows.length) throw new Error("no in_production reports row for this object — nothing to re-verify");
   const outcomes: string[] = [];
   for (const row of rows) {
@@ -235,6 +241,8 @@ async function handleNarrative(deps: EnrichDeps, job: AccountsJobRow): Promise<s
   if (!job.object_id) throw new Error("narrative job has no object_id");
   const obj = await deps.accounts.getObject(job.object_id);
   if (!obj) throw new Error(`object ${job.object_id} not found`);
+  // F-4: never write another tenant's object.
+  if (obj.user_id !== job.user_id) throw new Error("object/owner mismatch — nothing written");
   await writeNarrative(deps, job.user_id, obj);
   return `narrative written for “${obj.title}”`;
 }

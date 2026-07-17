@@ -119,6 +119,11 @@ export async function processAccountsReport(
 
   const obj = await deps.accounts.getObject(row.object_id);
   if (!obj) return { reportId: row.id, outcome: "failed", reason: `object ${row.object_id} not found` };
+  // F-4: never produce/deliver across tenants — the report row's user must own
+  // the object it points at.
+  if (obj.user_id !== row.user_id) {
+    return { reportId: row.id, outcome: "failed", reason: "object/owner mismatch" };
+  }
 
   const category = mapAccountsCategory(obj.category);
   if (!category) {

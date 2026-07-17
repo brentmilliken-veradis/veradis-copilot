@@ -190,6 +190,20 @@ describe("pollReports", () => {
     expect(byId["rep-3"].reason).toMatch(/not found/);
   });
 
+  it("F-4: a report row pointing at another tenant's object is never produced or delivered", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    accounts.objects.set("obj-1", { ...accounts.objects.get("obj-1")!, user_id: "someone-else" });
+
+    const d = deps(accounts);
+    const summary = await pollReports(d);
+
+    expect(summary.results[0]).toMatchObject({ outcome: "failed", reason: "object/owner mismatch" });
+    expect(accounts.uploads).toHaveLength(0);
+    expect(accounts.patches).toHaveLength(0);
+    expect(await d.repo.getOrder("rep-1")).toBeNull(); // nothing produced either
+  });
+
   it("fails (and leaves the row) when no photos are downloadable", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);
