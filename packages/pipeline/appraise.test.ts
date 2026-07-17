@@ -98,4 +98,20 @@ describe("F-8 — Appraise valuation honesty", () => {
       confirmReport(repo, { ...base, reportId: verify.report.id, valuationBand: { currency: "CAD", lo: 100, hi: 200 } }),
     ).rejects.toThrow(/no Appraise valuation/);
   });
+
+  it("R-6: an invalid band writes NO curator_action; a valid confirm mints exactly one", async () => {
+    const repo = new InMemoryRepository();
+    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder());
+    const base = { reportId: res.report.id, curator: "C", credentialClass: "curator" as const, verb: "confirmed" as const };
+
+    // Two invalid attempts throw — and leave the audit trail empty.
+    await expect(confirmReport(repo, { ...base, valuationBand: { currency: "CAD", lo: 0, hi: 0 } })).rejects.toThrow();
+    await expect(confirmReport(repo, { ...base, valuationBand: { currency: "CAD", lo: 900, hi: 100 } })).rejects.toThrow();
+    expect(await repo.listCuratorActions(res.report.id)).toHaveLength(0);
+    expect((await repo.getReport(res.report.id))?.status).toBe("provisional"); // not sealed
+
+    // A valid confirm mints exactly one immutable action.
+    await confirmReport(repo, { ...base, valuationBand: { currency: "CAD", lo: 1200, hi: 1800 } });
+    expect(await repo.listCuratorActions(res.report.id)).toHaveLength(1);
+  });
 });

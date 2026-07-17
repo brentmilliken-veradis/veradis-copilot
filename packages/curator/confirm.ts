@@ -38,17 +38,34 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
   const provisional = await repo.getLatestVersion(input.reportId);
   if (!provisional) throw new Error(`report ${input.reportId} has no version to confirm`);
 
+  // R-6 (fix brief v04): validate ALL inputs BEFORE minting the immutable,
+  // signed curator action — an invalid input must never leave an orphaned
+  // audit row that a retry then duplicates.
+
   // F-1/F-2 gate (fix brief v03): a capped report — uncalibrated category or
   // vision-only re-route — can never seal a definitive tier. Withholding (the
   // refund/curator-mediated path) remains available.
-  const capReason = provisional.snapshotJson.capReason;
+  const prevSnap = provisional.snapshotJson;
+  const capReason = prevSnap.capReason;
   if (capReason && input.verb !== "withheld") {
     throw new Error(
       `report ${input.reportId} is capped (${capReason}) — cannot confirm to definitive until the category is calibrated and the attribution corroborated`,
     );
   }
 
-  // Immutable, signed, credentialed record of the human decision.
+  // F-8: validate the expert-set indicative band (Appraise only, sane values)
+  // and pre-compute the sealed valuation. Runs before addCuratorAction (R-6).
+  let valuation = prevSnap.valuation;
+  if (input.valuationBand) {
+    const { currency, lo, hi } = input.valuationBand;
+    if (!valuation) throw new Error("valuationBand supplied for a report with no Appraise valuation section");
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo < 0 || hi < lo || (lo === 0 && hi === 0)) {
+      throw new Error("valuationBand must satisfy 0 ≤ lo ≤ hi and not be 0–0");
+    }
+    valuation = { ...valuation, currency, fmvLo: lo, fmvHi: hi };
+  }
+
+  // Inputs are valid — mint the immutable, signed, credentialed record.
   const action = await repo.addCuratorAction({
     reportId: report.id,
     curator: input.curator,
@@ -64,21 +81,9 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
   }
 
   // Confirmed / downgraded → mint the definitive version.
-  const prevSnap = provisional.snapshotJson;
   let tier = prevSnap.score.tier;
   if (input.verb === "downgraded" && input.downgradeTo) {
     tier = applyCritic(tier, input.downgradeTo); // never inflates
-  }
-
-  // F-8: apply the expert-set indicative band (Appraise only, sane values).
-  let valuation = prevSnap.valuation;
-  if (input.valuationBand) {
-    const { currency, lo, hi } = input.valuationBand;
-    if (!valuation) throw new Error("valuationBand supplied for a report with no Appraise valuation section");
-    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo < 0 || hi < lo || (lo === 0 && hi === 0)) {
-      throw new Error("valuationBand must satisfy 0 ≤ lo ≤ hi and not be 0–0");
-    }
-    valuation = { ...valuation, currency, fmvLo: lo, fmvHi: hi };
   }
 
   const nextV = provisional.v + 1;
