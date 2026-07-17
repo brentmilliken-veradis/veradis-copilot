@@ -24,6 +24,21 @@ describe("VeradisAccountsClient", () => {
     expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${KEY}`);
   });
 
+  it("F-7: rejects traversal paths before any request is made", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new VeradisAccountsClient(URL_BASE, KEY);
+    const hostile = ["a/../../b", "../secrets", "/etc/passwd", "a//b", "a/./b", "a\\b", ""];
+    for (const p of hostile) {
+      await expect(client.downloadObjectPhoto(p)).rejects.toThrow(/unsafe storage path/);
+      await expect(client.uploadReportFile(p, "rep", "<html/>")).rejects.toThrow(/unsafe storage path/);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    // A normal userId/report.html path still passes.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+    await expect(client.uploadReportFile("user-1", "rep-1", "<html/>")).resolves.toBe("user-1/rep-1.html");
+  });
+
   it("returns null for a missing photo", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
     const client = new VeradisAccountsClient(URL_BASE, KEY);

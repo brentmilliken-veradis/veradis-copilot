@@ -88,12 +88,16 @@ export function declaredAttributesFor(category: Category, obj: AccountsObjectRow
 async function downloadPhotos(deps: ReportPollerDeps, obj: AccountsObjectRow): Promise<PhotoInput[]> {
   const photos: PhotoInput[] = [];
   for (const path of obj.photo_paths ?? []) {
-    const bytes = await deps.accounts.downloadObjectPhoto(path);
-    if (!bytes) {
-      console.warn(`report poller: photo missing in accounts storage: ${path}`);
-      continue;
+    try {
+      const bytes = await deps.accounts.downloadObjectPhoto(path); // throws on an unsafe path (F-7)
+      if (!bytes) {
+        console.warn(`report poller: photo missing in accounts storage: ${path}`);
+        continue;
+      }
+      photos.push(await normalizePhoto(path.split("/").pop() ?? "photo.jpg", bytes));
+    } catch (e) {
+      console.warn(`report poller: photo skipped (${(e as Error).message}): ${path}`);
     }
-    photos.push(await normalizePhoto(path.split("/").pop() ?? "photo.jpg", bytes));
   }
   return photos;
 }

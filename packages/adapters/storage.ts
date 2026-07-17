@@ -38,8 +38,21 @@ export class StubStorage implements Storage {
 
 const DEFAULT_BUCKET = "verify-uploads";
 
+/** F-7: reject traversal before encoding — encodeURIComponent keeps '..'. */
+function assertSafeStoragePath(path: string): void {
+  if (!path || path.startsWith("/") || path.includes("\\")) {
+    throw new Error("unsafe storage path rejected");
+  }
+  for (const segment of path.split("/")) {
+    if (!segment || segment === "." || segment === "..") {
+      throw new Error("unsafe storage path rejected");
+    }
+  }
+}
+
 /** URL-encode each path segment, keeping the `/` separators. */
 function encodePath(key: string): string {
+  assertSafeStoragePath(key);
   return key.split("/").map(encodeURIComponent).join("/");
 }
 

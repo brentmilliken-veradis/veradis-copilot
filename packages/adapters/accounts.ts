@@ -114,7 +114,22 @@ export interface AccountsObjectEnrichPatch {
   enriched_state?: "linked" | "corroborated" | "flagged" | "reverify_due" | null;
 }
 
+/** F-7: encodeURIComponent leaves '.' and '..' intact, so a hostile
+ *  photo_paths entry like 'a/../../b' would escape the bucket. Reject any
+ *  path with an empty/dot segment, a leading slash, or a backslash. */
+export function assertSafeStoragePath(path: string): void {
+  if (!path || path.startsWith("/") || path.includes("\\")) {
+    throw new Error("unsafe storage path rejected");
+  }
+  for (const segment of path.split("/")) {
+    if (!segment || segment === "." || segment === "..") {
+      throw new Error("unsafe storage path rejected");
+    }
+  }
+}
+
 function encodePath(key: string): string {
+  assertSafeStoragePath(key);
   return key.split("/").map(encodeURIComponent).join("/");
 }
 
