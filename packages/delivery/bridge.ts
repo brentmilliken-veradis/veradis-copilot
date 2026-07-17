@@ -12,6 +12,10 @@ import type { VeradisAccountsClient } from "@/packages/adapters/accounts";
 import { renderReport } from "@/packages/report/render";
 import { markStubbed } from "@/packages/adapters/stub-registry";
 
+/** The slice of the accounts client the bridge needs (structural, so the
+ *  poller tests can substitute a fake). */
+export type DeliveryTarget = Pick<VeradisAccountsClient, "getReport" | "uploadReportFile" | "updateReport">;
+
 export interface DeliveryResult {
   delivered: boolean;
   filePath?: string;
@@ -23,7 +27,7 @@ export interface DeliveryResult {
 const DELIVERABLE = new Set(["provisional", "definitive", "flagged"]);
 
 export async function deliverReport(
-  accounts: VeradisAccountsClient | null,
+  accounts: DeliveryTarget | null,
   report: Report, // report.orderId = veradis-accounts reports.id (E-C contract)
   version: ReportVersion,
   now: () => string = () => new Date().toISOString(),
