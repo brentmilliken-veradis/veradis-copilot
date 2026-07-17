@@ -1,7 +1,17 @@
 // POST /api/v1/curator — a curator confirms / downgrades / withholds a report.
 // Calls the tested confirmReport domain logic against the app store.
+//
+// R-1 (fix brief v04): FAIL-CLOSED auth. This route seals reports definitive,
+// sets the expert valuation band, writes into the customer's account via the
+// service role, and emails the customer — it must never be publicly callable.
+// Auth model: server-to-server shared secret (CURATOR_AUTH_SECRET) held by the
+// account-template admin backend; the identity it forwards is trusted
+// TRANSITIVELY and recorded with its auth context. Once there is more than one
+// human curator, the identity MUST come from an authenticated per-user session
+// (Supabase admin JWT), not a body field a caller could spoof.
 
 import { getStore } from "@/app/lib/store";
+import { checkCuratorAuth } from "@/app/lib/cron-auth";
 import { confirmReport } from "@/packages/curator/confirm";
 import { sendDefinitive } from "@/packages/notify/emails";
 import { getAccountsClient } from "@/packages/adapters/accounts";
@@ -11,6 +21,9 @@ import type { CredentialClass, CuratorVerb, Tier } from "@/packages/pcs-types";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const denied = checkCuratorAuth(request); // R-1: fails closed, before ANY work
+  if (denied) return denied;
+
   let body: {
     reportId?: string;
     curator?: string;
@@ -32,9 +45,12 @@ export async function POST(request: Request) {
   const { repo, emailer } = await getStore();
   try {
     const res = await confirmReport(repo, {
-      reportId: body.reportId,
-      curator: body.curator ?? "Curator",
+      // R-1: the caller authenticated with the shared secret; the forwarded
+      // identity is trusted transitively and stamped with its auth context.
+      // credentialClass is defaulted SERVER-side — never taken as authority.
+      curator: `${body.curator ?? "Curator"} (auth: curator-shared-secret)`,
       credentialClass: body.credentialClass ?? "curator",
+      reportId: body.reportId,
       verb: body.verb,
       downgradeTo: body.downgradeTo,
       valuationBand: body.valuationBand,
