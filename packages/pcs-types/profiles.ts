@@ -53,6 +53,11 @@ export interface CategoryProfile {
   category: Category;
   version: number;
   label: string;
+  /** D-1 (fix brief v03): whether this category's sources + weights have been
+   *  calibrated. An uncalibrated ("provisional") category can never present a
+   *  confident Gold/Silver/Bronze tier — the pipeline caps it to Flagged and
+   *  the report stays provisional. Absent = "provisional" (safe by default). */
+  calibration?: "calibrated" | "provisional";
   /** Identity attributes + their intra-quadrant weights (sum to 1.0). */
   identityKeys: IdentityKey[];
   /** Keys that must never appear for this category (e.g. coins have no "serial"). */

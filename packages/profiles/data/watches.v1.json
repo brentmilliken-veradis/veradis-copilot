@@ -1,6 +1,7 @@
 {
   "category": "watches",
   "version": 1,
+  "calibration": "provisional",
   "label": "Watches (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
   "identityKeys": [
     { "key": "brand", "label": "Brand / maker", "weight": 0.2 },

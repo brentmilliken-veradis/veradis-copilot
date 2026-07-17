@@ -57,7 +57,7 @@ function artOrder(): OrderIntake {
 describe("E-E multi-category scaffolds", () => {
   beforeEach(() => resetStubRegistry());
 
-  it("an art order runs end-to-end → provisional, thin sources, no resolved authority", async () => {
+  it("an art order runs end-to-end → tier capped to flagged, provisional, confirm blocked (F-1)", async () => {
     const repo = new InMemoryRepository();
     const res = await runProvisional(repo, new StubStorage(), adapters(), artOrder());
 
@@ -65,24 +65,67 @@ describe("E-E multi-category scaffolds", () => {
     expect(res.snapshot.provisional).toBe(true);
     expect(res.profile.category).toBe("art");
 
+    // F-1: an uncalibrated category can never present a confident tier.
+    expect(res.snapshot.capReason).toBe("uncalibrated_category");
+    expect(["gold", "silver", "bronze"]).not.toContain(res.snapshot.score.tier);
+    expect(res.version.tier).toBe(res.snapshot.score.tier);
+
     // Thin sources: not one identity check closed by a Tier-1 authority.
     const identityChecks = res.snapshot.checks.filter((c) => c.quadrant === "identity");
     expect(identityChecks.length).toBeGreaterThan(0);
     expect(identityChecks.every((c) => c.authorityState !== "resolved")).toBe(true);
 
-    // The provisional watermark + honesty ceiling hold on the rendered report.
+    // The provisional watermark + honesty ceiling + uncalibrated line render.
     const html = renderReport(res.snapshot);
     expect(html).toContain("Provisional — under expert review");
+    expect(html).toContain("This category is not yet calibrated");
     expect(html.toLowerCase()).not.toContain("authenticated");
 
-    // A curator can still confirm it → definitive (Brent's own-collection path).
-    const confirmed = await confirmReport(repo, {
+    // F-1 gate: a capped report cannot be confirmed to definitive…
+    await expect(
+      confirmReport(repo, { reportId: res.report.id, curator: "Curator", credentialClass: "curator", verb: "confirmed" }),
+    ).rejects.toThrow(/capped/);
+    // …but the withhold (refund) path stays open.
+    const withheld = await confirmReport(repo, {
       reportId: res.report.id,
       curator: "Curator",
       credentialClass: "curator",
-      verb: "confirmed",
+      verb: "withheld",
     });
-    expect(confirmed.report.status).toBe("definitive");
+    expect(withheld.report.status).toBe("withheld");
+  });
+
+  it("F-1: an art object that would score a confident tier still seals capped", async () => {
+    // A generous fake Tier-1 art source resolves every identity key — the raw
+    // composite climbs, but the presented tier must stay capped.
+    const artTier1 = {
+      name: "Fake Art Registry",
+      tier: 1 as const,
+      role: "ground_truth" as const,
+      categories: ["art" as const],
+      async lookup(l: { key: string; value: string }) {
+        return {
+          adapter: "Fake Art Registry",
+          tier: 1 as const,
+          role: "ground_truth" as const,
+          matched: true,
+          value: l.value,
+          name: "Fake Art Registry",
+          retrievalState: "retrieved" as const,
+        };
+      },
+    };
+    const repo = new InMemoryRepository();
+    const res = await runProvisional(
+      repo,
+      new StubStorage(),
+      { ...adapters(), sources: [artTier1] },
+      artOrder(),
+    );
+    expect(["gold", "silver", "bronze"]).not.toContain(res.snapshot.score.tier);
+    expect(res.snapshot.capReason).toBe("uncalibrated_category");
+    // Composite + CI are preserved — only the presented tier is capped.
+    expect(res.snapshot.score.composite).toBeGreaterThan(0);
   });
 
   it("watches and fine-china orders run the same pipeline", async () => {

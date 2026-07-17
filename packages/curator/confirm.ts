@@ -35,6 +35,16 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
   const provisional = await repo.getLatestVersion(input.reportId);
   if (!provisional) throw new Error(`report ${input.reportId} has no version to confirm`);
 
+  // F-1/F-2 gate (fix brief v03): a capped report — uncalibrated category or
+  // vision-only re-route — can never seal a definitive tier. Withholding (the
+  // refund/curator-mediated path) remains available.
+  const capReason = provisional.snapshotJson.capReason;
+  if (capReason && input.verb !== "withheld") {
+    throw new Error(
+      `report ${input.reportId} is capped (${capReason}) — cannot confirm to definitive until the category is calibrated and the attribution corroborated`,
+    );
+  }
+
   // Immutable, signed, credentialed record of the human decision.
   const action = await repo.addCuratorAction({
     reportId: report.id,

@@ -1,6 +1,7 @@
 {
   "category": "art",
   "version": 1,
+  "calibration": "provisional",
   "label": "Art — paintings, works on paper (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
   "identityKeys": [
     { "key": "artist", "label": "Artist / attribution", "weight": 0.3 },

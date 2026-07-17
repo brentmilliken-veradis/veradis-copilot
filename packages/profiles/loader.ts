@@ -84,7 +84,16 @@ export function validateProfile(p: CategoryProfile): CategoryProfile {
     }
   }
 
-  return p;
+  if (p.calibration !== undefined && p.calibration !== "calibrated" && p.calibration !== "provisional") {
+    throw new ProfileValidationError(
+      `profile ${p.category}@${p.version} has invalid calibration "${p.calibration as string}"`,
+    );
+  }
+
+  // Safe by default (D-1): a profile that doesn't declare calibration is
+  // treated as provisional — a new category can never present a confident tier
+  // by omission.
+  return { ...p, calibration: p.calibration ?? "provisional" };
 }
 
 /** Load a built-in profile by category (latest version, or a pinned version). */

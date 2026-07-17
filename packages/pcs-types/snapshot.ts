@@ -136,6 +136,11 @@ export interface ReportSnapshot {
   narrative: NarrativeSection[];
   /** Watermark "Provisional — under expert review" until a curator confirms. */
   provisional: boolean;
+  /** Set when the presented tier was capped (fix brief v03 F-1/F-2): the
+   *  category is uncalibrated, or the category came from a vision-only
+   *  re-route. A capped report can never be confirmed to definitive. Omitted
+   *  entirely when uncapped so calibrated-category hashes are unchanged. */
+  capReason?: "uncalibrated_category" | "vision_reroute";
   /** Populated on v≥2 to render the evidence-ladder delta panel. */
   delta?: DeltaRow[];
 }

@@ -1,6 +1,7 @@
 {
   "category": "fine-china",
   "version": 1,
+  "calibration": "provisional",
   "label": "Fine china & porcelain (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
   "identityKeys": [
     { "key": "manufactory", "label": "Manufactory / maker", "weight": 0.3 },

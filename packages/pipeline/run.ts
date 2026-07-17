@@ -26,6 +26,7 @@ import type { GraphAdapter } from "@/packages/adapters/graph";
 import type { SanctionsAdapter } from "@/packages/adapters/sanctions";
 import type { NarrativeAdapter } from "@/packages/adapters/narrative";
 import { listStubbed, type StubFlag } from "@/packages/adapters/stub-registry";
+import { capTier } from "./cap";
 import { intakeOrder } from "@/packages/intake/intake";
 import type { OrderIntake } from "@/packages/intake/types";
 import { ingest } from "@/packages/ingestion/ingest";
@@ -67,6 +68,7 @@ async function assembleSnapshot(
   score: PcsScore,
   valuation: Valuation | undefined,
   narrativeSections: ReportSnapshot["narrative"],
+  capReason: ReportSnapshot["capReason"],
 ): Promise<ReportSnapshot> {
   const labels = new Map(profile.identityKeys.map((k) => [k.key, k.label]));
   const citations = await repo.listCitations(report.id);
@@ -127,6 +129,8 @@ async function assembleSnapshot(
     valuation,
     narrative: narrativeSections,
     provisional: true,
+    // Included only when capped, so calibrated-category hashes are unchanged.
+    ...(capReason ? { capReason } : {}),
   };
 }
 
@@ -163,12 +167,26 @@ export async function runProvisional(
   // E5 — deterministic score
   const score = scorePcs(enr.scoreInputs);
 
-  // Narrative (prose only — never the number)
+  // F-1 (D-1): an uncalibrated category can never present a confident tier.
+  // F-2 (D-2): a vision-only category re-route can never seal a tier either.
+  // Both cap the PRESENTED tier only — composite/CI are the scorer's, untouched.
+  const calibration = ing.profile.calibration ?? "provisional";
+  const capReason: ReportSnapshot["capReason"] = ing.rerouted
+    ? "vision_reroute"
+    : calibration === "provisional"
+      ? "uncalibrated_category"
+      : undefined;
+  const presented: PcsScore = capReason ? { ...score, tier: capTier(score.tier, "provisional") } : score;
+
+  // Narrative (prose only — never the number). A capped result uses the
+  // bronze register ("material gaps, disclosed") — the flagged register claims
+  // identity-mismatch evidence, which a calibration cap has not established.
+  const narrativeTier = capReason && presented.tier === "flagged" && score.tier !== "flagged" ? "bronze" : presented.tier;
   const narrative = await adapters.narrative.draft({
     title: order.ownerFacingName ?? ing.report.objectId,
     category: ing.report.category,
     resolvedAttributes: ing.resolvedAttributes,
-    tier: score.tier,
+    tier: narrativeTier,
     corrections: ing.corrections.map((c) => ({ claimed: c.claimed, correctedValue: c.correctedValue })),
   });
 
@@ -191,9 +209,10 @@ export async function runProvisional(
     ing.profile,
     ing.declaredAttributes,
     ing.resolvedAttributes,
-    score,
+    presented,
     valuation,
     narrative,
+    capReason,
   );
   const sealed = sealVersion(snapshot0); // v1, no predecessor
 
@@ -203,15 +222,15 @@ export async function runProvisional(
     snapshotJson: sealed,
     snapshotSha256: sealed.snapshotSha256!,
     supersedesSha256: null,
-    tier: score.tier,
-    composite: score.composite,
-    ciLo: score.ci.lo,
-    ciHi: score.ci.hi,
+    tier: presented.tier,
+    composite: presented.composite,
+    ciLo: presented.ci.lo,
+    ciHi: presented.ci.hi,
     pdfPath: null,
   });
 
   // paid → provisional | unscored | withheld
-  const nextStatus = statusForTier(score.tier);
+  const nextStatus = statusForTier(presented.tier);
   assertTransition(ing.report.status, nextStatus);
   const updated = await repo.updateReport(ing.report.id, { status: nextStatus, currentVersion: 1 });
 
@@ -219,7 +238,7 @@ export async function runProvisional(
     report: updated,
     version,
     snapshot: sealed,
-    score,
+    score: presented,
     corrections: ing.corrections,
     profile: ing.profile,
     stubs: listStubbed(),

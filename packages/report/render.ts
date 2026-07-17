@@ -41,10 +41,18 @@ function verdict(s: ReportSnapshot): string {
         .map((qs) => `${Math.round(qs.raw)}×${WEIGHTS[qs.quadrant].toFixed(2)}`)
         .join(" + ")}) = ${score.composite}`
     : "";
+  const CAP_LINES: Record<NonNullable<ReportSnapshot["capReason"]>, string> = {
+    uncalibrated_category:
+      "This category is not yet calibrated; the result is provisional pending Tier-1 sources.",
+    vision_reroute:
+      "The category attribution was re-read from the images alone; the result is provisional pending corroboration.",
+  };
+  const capNote = s.capReason ? `<p class="cap-note">${CAP_LINES[s.capReason]}</p>` : "";
   return `<section class="verdict"><h2>Provenance Confidence Score</h2>
     <p class="score"><span class="pcs-num">${Math.round(score.composite)}</span>
       <span class="pcs-ci">± ${ciWidth} · 95% CI [${score.ci.lo.toFixed(0)}, ${score.ci.hi.toFixed(0)}]</span></p>
     <p class="tier tier-${score.tier}">${tier} <span class="lb">tier on the lower bound (${score.ci.lo.toFixed(0)})</span></p>
+    ${capNote}
     <table class="bars">${bars}</table>
     <p class="arith">${arithmetic}</p></section>`;
 }
