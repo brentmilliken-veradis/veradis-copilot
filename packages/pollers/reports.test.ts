@@ -124,6 +124,22 @@ describe("declaredAttributesFor", () => {
 describe("pollReports", () => {
   beforeEach(() => resetStubRegistry());
 
+  it("Cleanup 2: a throwing curator-email sweep does not sink the tick", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    // The sweep reads listReportsByStatus — make it throw AFTER the row side
+    // effects have committed; pollReports must still return its summary.
+    d.repo.listReportsByStatus = async () => {
+      throw new Error("status query exploded");
+    };
+
+    const summary = await pollReports(d);
+
+    expect(summary).toMatchObject({ polled: 1, delivered: 1, failed: 0, curatorEmailsResent: 0 });
+    expect(accounts.patches[0].patch.status).toBe("delivered"); // row work still committed
+  });
+
   it("drains a painting order end-to-end: provisional produced, delivered, EMAIL B", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);

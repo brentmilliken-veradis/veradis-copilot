@@ -319,7 +319,15 @@ export async function pollReports(deps: ReportPollerDeps): Promise<PollSummary> 
       results.push({ reportId: row.id, outcome: "failed", reason: (e as Error).message });
     }
   }
-  const curatorEmailsResent = await sweepCuratorEmails(deps);
+  // Cleanup 2: the sweep must never sink a tick — row side effects above have
+  // already committed. A sweep-level failure (e.g. listReportsByStatus throws)
+  // is logged and swallowed; the tick still returns its summary.
+  let curatorEmailsResent = 0;
+  try {
+    curatorEmailsResent = await sweepCuratorEmails(deps);
+  } catch (e) {
+    console.error("report poller: curator-email sweep failed (tick continues):", e);
+  }
   return {
     polled: rows.length,
     delivered: results.filter((r) => r.outcome === "delivered").length,
