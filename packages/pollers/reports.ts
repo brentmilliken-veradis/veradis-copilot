@@ -58,7 +58,9 @@ export function mapAccountsCategory(raw: string | null | undefined): Category | 
   if (/medal|milit/.test(v)) return "medals";
   if (/watch|horolog/.test(v)) return "watches";
   if (/card/.test(v)) return "cards";
-  if (/silver|flatware/.test(v)) return "silver";
+  if (/silver|flatware|metalware/.test(v)) return "silver";
+  if (/jewel|gem|ring|necklace|bracelet|brooch|earring/.test(v)) return "jewellery";
+  if (/handbag|hand bag|purse|luxury|designer bag|birkin|kelly|leather goods/.test(v)) return "luxury";
   if (/paint|art|drawing|print|sculpt|canvas/.test(v)) return "art";
   if (/china|porcelain|ceramic|pottery/.test(v)) return "fine-china";
   return null;

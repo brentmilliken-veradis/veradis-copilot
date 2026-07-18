@@ -11,14 +11,18 @@ import medalsV2 from "./data/medals.v2.json";
 import watchesV1 from "./data/watches.v1.json";
 import artV1 from "./data/art.v1.json";
 import fineChinaV1 from "./data/fine-china.v1.json";
+import silverV1 from "./data/silver.v1.json";
+import jewelleryV1 from "./data/jewellery.v1.json";
+import luxuryV1 from "./data/luxury.v1.json";
 
 /** Registry of built-in profiles. A category ships `provisional` (tier capped
  *  to Flagged) until its calibration is validated — a golden set + a validated
  *  real-object field-golden entry (see tests/golden/<cat>-calibration-v1.json).
  *  COINS is calibrated: PCGS/Numista Tier-1 + the 2007 RCM golden ladder. Medals
- *  is structurally full but not yet field-validated; watches, art and fine-china
- *  are ADR-002 SCAFFOLDS, thin-sourced. All non-calibrated categories run
- *  provisional/flagged and cannot seal definitive until their calibration lands. */
+ *  is structurally full but not yet field-validated; watches, art, fine-china,
+ *  silver and jewellery are SCAFFOLDS, thin-sourced. All non-calibrated
+ *  categories run provisional/flagged and cannot seal definitive until their
+ *  calibration lands. */
 const REGISTRY: CategoryProfile[] = [
   coinsV1 as CategoryProfile,
   medalsV1 as CategoryProfile,
@@ -26,6 +30,9 @@ const REGISTRY: CategoryProfile[] = [
   watchesV1 as CategoryProfile,
   artV1 as CategoryProfile,
   fineChinaV1 as CategoryProfile,
+  silverV1 as CategoryProfile,
+  jewelleryV1 as CategoryProfile,
+  luxuryV1 as CategoryProfile,
 ];
 
 const VALID_QUADRANTS: ReadonlySet<Quadrant> = new Set<Quadrant>([

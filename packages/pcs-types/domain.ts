@@ -4,10 +4,11 @@
 // SQL migration uses snake_case columns and the (deferred) Supabase
 // repository maps between them.
 
-/** The category profiles. Phase A shipped Coins (full); ADR-002 adds art,
- *  fine-china and full watches/medals as thin-source SCAFFOLDS — they run
- *  provisional/flagged until real Tier-1 sources + calibration land (P2). */
-export type Category = "coins" | "cards" | "medals" | "watches" | "silver" | "art" | "fine-china";
+/** The category profiles. Coins is calibrated; watches, medals, art, fine-china,
+ *  silver and jewellery ship as provisional SCAFFOLDS — they run provisional/
+ *  flagged until real Tier-1 sources + calibration land (P2). `cards` maps but
+ *  has no profile yet (routes to refund until one is built). */
+export type Category = "coins" | "cards" | "medals" | "watches" | "silver" | "jewellery" | "luxury" | "art" | "fine-china";
 
 /** Runtime list of every category — for validating untrusted category strings
  *  (webhook payloads, vision output) against the union. Keep in sync. */
@@ -17,6 +18,8 @@ export const ALL_CATEGORIES: readonly Category[] = [
   "medals",
   "watches",
   "silver",
+  "jewellery",
+  "luxury",
   "art",
   "fine-china",
 ];

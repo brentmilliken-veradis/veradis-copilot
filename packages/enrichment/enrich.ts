@@ -40,6 +40,8 @@ const SCALE_BY_CATEGORY: Record<string, number> = {
   cards: 10,
   medals: 5,
   silver: 5,
+  jewellery: 5,
+  luxury: 5,
 };
 
 export interface EnrichAdapters {
@@ -80,6 +82,13 @@ export interface EnrichResult {
 const MATERIAL_FLAGS = new Set([
   "cast_tooled", "altered_date", "cleaned_whizzed", "fake_slab", "renamed", "copy_striking",
   "redial", "franken", "fake_movement", "overpolished_case",
+  // Silver / jewellery integrity tells. Identity tells (erased_altered_hallmark,
+  // added_altered_signature, duty_dodger) stay outside the material set.
+  "replated", "married", "later_decoration",
+  "replaced_stones", "converted", "synthetic_as_natural", "plated_as_solid",
+  // Luxury / handbag integrity tells (counterfeit, mismatched_stamp are
+  // identity/verdict tells, handled outside the material set).
+  "replaced_hardware", "rebuilt_restored", "franken_bag",
 ]);
 
 export async function enrich(

@@ -1,0 +1,37 @@
+{
+  "category": "luxury",
+  "version": 1,
+  "calibration": "provisional",
+  "label": "Designer handbags & luxury goods (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "identityKeys": [
+    { "key": "maison", "label": "Maison / brand", "weight": 0.25 },
+    { "key": "model", "label": "Model / line", "weight": 0.2 },
+    { "key": "date_code", "label": "Date code / blind stamp", "weight": 0.2 },
+    { "key": "material", "label": "Material / leather", "weight": 0.2 },
+    { "key": "hardware", "label": "Hardware", "weight": 0.15 }
+  ],
+  "captureSlots": [
+    { "slotId": "heat_stamp_macro", "label": "Heat stamp / blind stamp", "guidance": "Macro of the embossed maison heat stamp and date/blind stamp.", "requiredFor": "identity", "core": true, "unlocks": ["stamp_dating"] },
+    { "slotId": "full_piece", "label": "Full piece", "guidance": "Whole bag / item, square-on, even light, both faces.", "requiredFor": "identity", "core": true },
+    { "slotId": "hardware_macro", "label": "Hardware macro", "guidance": "Macro of engraved hardware (lock, zipper pull, feet) showing brand marks.", "requiredFor": "identity", "core": true },
+    { "slotId": "interior_stamp", "label": "Interior stamp / date code", "guidance": "Interior brand stamp and date code / serial.", "requiredFor": "identity", "core": true, "unlocks": ["date_code_lookup"] },
+    { "slotId": "leather_grain", "label": "Leather / material detail", "guidance": "Close detail of grain, stitching (stitch count, saddle stitch), and edge paint.", "requiredFor": "material", "core": false },
+    { "slotId": "feet_base", "label": "Base and feet", "guidance": "Base, feet and corners — wear consistent with age and use.", "requiredFor": "material", "core": false },
+    { "slotId": "card_dustbag_receipt", "label": "Card / dustbag / receipt", "guidance": "Authenticity card, receipt, dustbag and box.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "counterfeit", "label": "Counterfeit", "description": "A replica presented as genuine — the super-fake case." },
+    { "key": "replaced_hardware", "label": "Replaced hardware", "description": "Non-genuine or swapped hardware inconsistent with the model and period." },
+    { "key": "rebuilt_restored", "label": "Rebuilt / restored", "description": "Relined, repainted or rebuilt elements presented as original condition." },
+    { "key": "mismatched_stamp", "label": "Mismatched stamp", "description": "Date code or blind stamp inconsistent with the model, hardware or material." },
+    { "key": "franken_bag", "label": "Frankenbag", "description": "Assembled from parts of different bags." }
+  ],
+  "corpusSources": [
+    { "name": "Maison archives / boutique confirmation (Hermès, Chanel, Louis Vuitton)", "tier": 1, "role": "ground_truth" },
+    { "name": "Auction archives (Christie's Handbags & Accessories, Bonhams, Rapp)", "tier": 2, "role": "corroboration" },
+    { "name": "Resale-platform reference data", "tier": 3, "role": "corroboration" },
+    { "name": "Authentication forums and reference boards", "tier": 4, "role": "cite_only" }
+  ],
+  "compKeys": ["maison", "model", "material", "hardware", "condition", "year"],
+  "materialSlotClass": "leather_hardware_stamp"
+}

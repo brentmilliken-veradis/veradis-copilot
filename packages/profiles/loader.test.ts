@@ -41,8 +41,8 @@ describe("profile loader", () => {
     expect(() => validateProfile(bad)).toThrow(/forbidden identity key/);
   });
 
-  it("loads the E-E scaffold profiles (watches, art, fine-china) validated", () => {
-    for (const cat of ["watches", "art", "fine-china"] as const) {
+  it("loads the scaffold profiles (watches, art, fine-china, silver, jewellery, luxury) validated", () => {
+    for (const cat of ["watches", "art", "fine-china", "silver", "jewellery", "luxury"] as const) {
       const p = loadProfile(cat);
       expect(p.category).toBe(cat);
       expect(p.version).toBe(1);
