@@ -84,6 +84,25 @@ export function declaredAttributesFor(category: Category, obj: AccountsObjectRow
     attrs.year = year;
     if (category === "fine-china") attrs.date_range = year;
   }
+
+  // Parse the owner's declared identity out of the free-text title + maker so
+  // the category's identity keys aren't starved when the object was entered via
+  // the simple form (title/maker/year). These are DECLARED (owner-stated),
+  // scored at half credit — a live Tier-1 source / vision would confirm them to
+  // full. Without this, a "Royal Canadian Mint · Proof Silver Dollar" scores as
+  // if its country / denomination / mint / variety were unknown.
+  if (category === "coins") {
+    const t = `${obj.title ?? ""} ${maker ?? ""}`;
+    if (/royal canadian mint|\brcm\b|canadian mint/i.test(t)) {
+      attrs.country ??= "Canada";
+      attrs.mint_mark ??= "Royal Canadian Mint";
+    }
+    const variety = /\bproof\b/i.test(t) ? "Proof" : /specimen/i.test(t) ? "Specimen" : /uncirculated|\bunc\b/i.test(t) ? "Uncirculated" : /bullion/i.test(t) ? "Bullion" : null;
+    if (variety) attrs.variety ??= variety;
+    const denom = /\bdollar/i.test(t) ? "Dollar" : /\bcent|\bpenny/i.test(t) ? "Cent" : /quarter/i.test(t) ? "Quarter" : /\bdime/i.test(t) ? "Dime" : /nickel/i.test(t) ? "Nickel" : null;
+    if (denom) attrs.denomination ??= denom;
+  }
+
   if (obj.notes?.trim()) attrs.notes = obj.notes.trim();
   return attrs;
 }
