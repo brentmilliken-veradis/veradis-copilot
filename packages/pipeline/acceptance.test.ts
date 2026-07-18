@@ -1,5 +1,6 @@
 // Phase A acceptance — the end-to-end gate (BUILD-KICKOFF "Acceptance A"):
-//   1. a real coin runs end-to-end → a provisional a curator confirms
+//   1. a real coin runs end-to-end → provisional, capped (uncalibrated) until
+//      calibration lands: confirm-to-definitive blocked, withhold open
 //   2. a mislabelled coin is auto-corrected
 //   3. the engine reproduces the 2007 RCM proof-set report incl. the v01→v02 ladder
 // All on seeded data with stubbed adapters.
@@ -67,28 +68,35 @@ function order(overrides: Partial<OrderIntake> = {}): OrderIntake {
 describe("Phase A acceptance", () => {
   beforeEach(() => resetStubRegistry());
 
-  it("1 — a real coin runs end-to-end → a provisional a curator confirms", async () => {
+  it("1 — a real coin runs end-to-end → provisional, capped until coins is calibrated", async () => {
     const repo = new InMemoryRepository();
     const res = await runProvisional(repo, new StubStorage(), adapters(), order());
 
     // scored, provisional, scoreable
     expect(res.report.status).toBe("provisional");
     expect(res.score.isScoreable).toBe(true);
-    expect(["gold", "silver", "bronze", "flagged"]).toContain(res.score.tier);
     expect(res.version.v).toBe(1);
     expect(res.snapshot.evidence).toHaveLength(9); // nine photos hashed
 
-    // it renders
+    // Coins is not yet calibration-validated → the presented tier is capped to
+    // Flagged and the report cannot seal definitive (honesty gate F-1).
+    expect(res.snapshot.capReason).toBe("uncalibrated_category");
+    expect(res.snapshot.score.tier).toBe("flagged");
+
+    // it renders honestly
     const html = renderReport(res.snapshot);
     expect(html).toContain("Provenance Confidence Score");
     expect(html).toContain("Provisional — under expert review");
+    expect(html).toContain("This category is not yet calibrated");
     expect(html.toLowerCase()).not.toContain("authenticated");
 
-    // a curator confirms → definitive
-    const confirmed = await confirmReport(repo, { reportId: res.report.id, curator: "Curator", credentialClass: "curator", verb: "confirmed" });
-    expect(confirmed.report.status).toBe("definitive");
-    expect(confirmed.version!.v).toBe(2);
-    expect(confirmed.version!.supersedesSha256).toBe(res.version.snapshotSha256); // hash chain
+    // a capped report cannot be confirmed to definitive…
+    await expect(
+      confirmReport(repo, { reportId: res.report.id, curator: "Curator", credentialClass: "curator", verb: "confirmed" }),
+    ).rejects.toThrow(/capped/);
+    // …but the withhold (refund) path stays open.
+    const withheld = await confirmReport(repo, { reportId: res.report.id, curator: "Curator", credentialClass: "curator", verb: "withheld" });
+    expect(withheld.report.status).toBe("withheld");
 
     // every external adapter ran as a stub, each flagged with the key it needs
     expect(res.stubs.map((s) => s.envKey)).toEqual(

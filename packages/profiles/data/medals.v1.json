@@ -1,7 +1,7 @@
 {
   "category": "medals",
   "version": 1,
-  "calibration": "calibrated",
+  "calibration": "provisional",
   "label": "Medals & militaria (UK / Commonwealth)",
   "identityKeys": [
     { "key": "naming", "label": "Rim naming (rank/name/unit)", "weight": 0.35 },
