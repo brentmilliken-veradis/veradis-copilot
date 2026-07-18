@@ -22,6 +22,7 @@ import { retrieveTopK } from "@/packages/adapters/embedding";
 import type { GraphAdapter } from "@/packages/adapters/graph";
 import type { SanctionsAdapter } from "@/packages/adapters/sanctions";
 import type { VisionRedFlag } from "@/packages/adapters/vision";
+import { deriveProvenanceCustody } from "./provenance";
 
 const CORPUS_MATCH_THRESHOLD = 0.35;
 // P2 (fix brief v04): a vision-ADDED value (the owner never declared this key)
@@ -255,16 +256,32 @@ export async function enrich(
     category: report.category,
     attributes: corroboratedAttributes,
   });
+  // The owner's provenance description (notes) is custody documentation: a
+  // described single-owner / sealed / papered history lifts coverage + quality
+  // (capped — a claim, not proof), and documented-evidence signals add a trial.
+  const prov = deriveProvenanceCustody(declaredAttributes.notes);
   const baseCoverage = input.custodyHint?.coverage ?? 0.5;
-  const coverage = Math.min(1, baseCoverage + links.reduce((a, l) => a + l.confidence * 0.1, 0));
+  const coverage = Math.min(1, baseCoverage + links.reduce((a, l) => a + l.confidence * 0.1, 0) + prov.coverage);
   const custody: CustodyInput = {
     coverage,
-    documentQuality: input.custodyHint?.documentQuality ?? 0.7,
+    documentQuality: Math.min(0.95, (input.custodyHint?.documentQuality ?? 0.7) + prov.quality),
     gaps: input.custodyHint?.gaps ?? [],
     // One trial per documented custody evidence item: the owner's declared
-    // baseline plus each graph cross-ref link (Scenario B n_eff).
-    eventCount: input.custodyHint?.eventCount ?? 1 + links.length,
+    // baseline, each graph cross-ref link, and each documented provenance
+    // signal (receipt / papers / named chain) — Scenario B n_eff.
+    eventCount: input.custodyHint?.eventCount ?? 1 + links.length + prov.events,
   };
+  for (const s of prov.signals) {
+    await repo.addCheck({
+      reportId: report.id,
+      quadrant: "custody",
+      key: `provenance_${s.key}`,
+      result: "consistent",
+      authorityState: "declared",
+      sourceId: null,
+      note: `${s.label} (owner-stated)`,
+    });
+  }
   for (const l of links) {
     const src = await repo.addCitation({
       reportId: report.id,
