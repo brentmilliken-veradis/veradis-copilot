@@ -69,6 +69,20 @@ export function numistaAdapter(scenario: SourceScenario = {}): SourceAdapter {
   return new StubSourceAdapter("Numista", 1, "ground_truth", ["coins"], "NUMISTA_API_KEY", scenario);
 }
 
+// Watches (BUILD-KICKOFF E11). Brand archive extracts (e.g. Omega Extract of the
+// Archives, Rolex service confirmations) are the Tier-1 IDENTITY ground truth — a
+// match closes brand/reference/serial. WatchCharts corroborates market data at
+// Tier-2 (cite, never closes). Both stub until their keys land. NOTE: The Watch
+// Register is a THEFT (risk) source, not identity — it belongs in the risk path
+// (the paid theft add-on), NOT here, so it never mis-resolves an identity check.
+export function brandArchiveAdapter(scenario: SourceScenario = {}): SourceAdapter {
+  return new StubSourceAdapter("Brand archive extract", 1, "ground_truth", ["watches"], "BRAND_ARCHIVE_API_KEY", scenario);
+}
+
+export function watchChartsAdapter(scenario: SourceScenario = {}): SourceAdapter {
+  return new StubSourceAdapter("WatchCharts", 2, "corroboration", ["watches"], "WATCHCHARTS_API_KEY", scenario);
+}
+
 /** Route a lookup to every adapter that serves the category; return the
  *  highest-authority match (lowest tier number wins), else the first result. */
 export async function routeLookup(
