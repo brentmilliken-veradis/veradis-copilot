@@ -86,8 +86,12 @@ export function scoreMaterial(checks: MaterialCheckInput[]): QuadrantRaw {
   return { raw, totalWeight: runCount, missingWeight, populated: true, flags };
 }
 
-/** §5 + §10.3 — Risk. Starts at 100, minus severity penalties; ALR cap ≤90. */
-export function scoreRisk(events: RiskEventInput[], alrEnabled: boolean): QuadrantRaw {
+/** §5 + §10.3 — Risk. Starts at 100, minus severity penalties; ALR cap ≤90.
+ *  `theftRegistryChecked` (the paid stolen-property add-on) adds a second
+ *  resolved risk trial → higher n_eff → tighter CI. It does NOT lift the raw
+ *  (the 90 cap stands while ALR is off); its benefit is confidence, so it can
+ *  raise the tier on the lower bound. The base case is unchanged. */
+export function scoreRisk(events: RiskEventInput[], alrEnabled: boolean, theftRegistryChecked = false): QuadrantRaw {
   let score = 100;
   let hasHigh = false;
   for (const e of events) {
@@ -102,5 +106,8 @@ export function scoreRisk(events: RiskEventInput[], alrEnabled: boolean): Quadra
     score = ALR_RISK_CAP;
     flags.push("STOLEN_REGISTRY_PARTIAL_COVERAGE");
   }
-  return { raw: score, totalWeight: 1, missingWeight: 0, populated: true, flags };
+  // One trial for the sanctions/PEP screen (always run); the stolen-property
+  // register is a second trial only when the add-on cleared it.
+  const totalWeight = theftRegistryChecked ? 2 : 1;
+  return { raw: score, totalWeight, missingWeight: 0, populated: true, flags };
 }

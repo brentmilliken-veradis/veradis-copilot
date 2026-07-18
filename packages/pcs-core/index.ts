@@ -125,7 +125,7 @@ export function scorePcs(inputs: ScoreInputs): PcsScore {
       identity: scoreIdentity(inputs.identity),
       custody: scoreCustody(inputs.custody),
       material: scoreMaterial(inputs.material),
-      risk: scoreRisk(inputs.risk, inputs.alrEnabled),
+      risk: scoreRisk(inputs.risk, inputs.alrEnabled, inputs.theftRegistryChecked ?? false),
     },
     {
       objectId: inputs.objectId,

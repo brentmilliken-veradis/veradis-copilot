@@ -71,4 +71,9 @@ export interface ScoreInputs {
   withheldDisclosure: boolean;
   /** CI scale factor (10 horology / 5 military / 3 automotive; default 5). */
   scaleFactor: number;
+  /** True when the paid stolen-property register add-on actually ran, closing a
+   *  second risk trial → tighter risk CI. False/absent = base Verify: the
+   *  register was not queried, the risk raw is unchanged (already 90-capped for
+   *  partial coverage) but it earns no extra confidence. */
+  theftRegistryChecked?: boolean;
 }

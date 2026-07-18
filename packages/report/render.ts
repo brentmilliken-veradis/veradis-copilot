@@ -23,6 +23,8 @@ const REPRODUCIBILITY_LINE = "Re-running this method against this data snapshot 
 const FALSIFIABILITY_LINE = "Every score is falsifiable: each check names the source that would overturn it.";
 const HONESTY_CEILING = "Verified against the documentary record, expert-reviewed. This is not a certificate of authenticity and not a certified appraisal.";
 const ALR_COVERAGE_LINE = "Stolen-property check covers Interpol, FBI Art Crime Team, ICOM Red Lists, and CBP repatriation registry. Art Loss Register integration scheduled Q3 2026. This report does not discharge the recipient's own diligence obligations.";
+const THEFT_NOT_CHECKED_LINE = "Stolen-property register: not checked. The hard register clearance is a paid add-on and is not included in this base report — its absence widens no claim: nothing here asserts this item is not stolen.";
+const THEFT_CLEARED_LINE = "Stolen-property register: no match on the check date; a clearance certificate accompanies this report.";
 const LIABILITY_LINE = "This report is intelligence, not insurance: a probabilistic verification based on the data available at the time of query. It is not a legal determination and confers no indemnity.";
 
 function verdict(s: ReportSnapshot): string {
@@ -189,8 +191,14 @@ export function renderReport(s: ReportSnapshot): string {
   const watermark = s.provisional
     ? `<div class="watermark">Provisional — under expert review</div>`
     : "";
+  const theftCheck = s.checks.find((c) => c.quadrant === "risk" && c.key === "stolen_registry");
+  const theftLine = theftCheck
+    ? theftCheck.authorityState === "resolved"
+      ? THEFT_CLEARED_LINE
+      : THEFT_NOT_CHECKED_LINE
+    : "";
   const registrySweep = `<section class="registry"><h3>Registry sweep</h3>
-    <p>${esc(ALR_COVERAGE_LINE)}</p><p class="caveat">${esc(REGISTRY_CAVEAT)}</p></section>`;
+    <p>${esc(ALR_COVERAGE_LINE)}</p>${theftLine ? `<p class="theft">${esc(theftLine)}</p>` : ""}<p class="caveat">${esc(REGISTRY_CAVEAT)}</p></section>`;
 
   const article = `<article class="pcs-report tier-${s.score.tier}">
   ${watermark}

@@ -25,4 +25,9 @@ export interface OrderIntake {
   photos: PhotoInput[];
   ownerLocale?: string;
   currency?: string;
+  /** Paid add-ons purchased alongside the base SKU. `theftRegistry` = the hard
+   *  stolen-property register check (e.g. The Watch Register for watches). When
+   *  absent, the base report discloses the register was NOT checked and the risk
+   *  CI is not tightened by it. */
+  addons?: { theftRegistry?: boolean };
 }

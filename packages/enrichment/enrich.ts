@@ -59,6 +59,10 @@ export interface EnrichInput {
   custodyHint?: Partial<CustodyInput>;
   materialHint?: MaterialCheckInput[];
   parties?: string[];
+  /** The paid stolen-property register add-on was purchased AND run. When false,
+   *  the base report discloses the register was not checked and the risk CI is
+   *  not tightened by it. */
+  theftRegistryChecked?: boolean;
 }
 
 export interface EnrichResult {
@@ -271,7 +275,12 @@ export async function enrich(
     });
   }
 
-  // ── Risk (sanctions + stolen registries; ALR off) ────────────────────────
+  // ── Risk (sanctions + stolen-property register) ──────────────────────────
+  // The sanctions/PEP screen runs always. The stolen-property REGISTER is the
+  // paid theft add-on — recording it "resolved: no match" when nobody queried
+  // it is a confident-clean we did not earn. So: hits are flagged; a clean
+  // sanctions screen is recorded as run; and the stolen-property register is
+  // recorded resolved ONLY when the add-on ran, otherwise as an honest gap.
   const riskEvents: RiskEventInput[] = await adapters.sanctions.check({
     parties: input.parties ?? [],
     objectId: report.objectId,
@@ -292,13 +301,24 @@ export async function enrich(
     await repo.addCheck({
       reportId: report.id,
       quadrant: "risk",
-      key: "registries",
+      key: "sanctions_screen",
       result: "match",
       authorityState: "resolved",
       sourceId: null,
-      note: "no match in the named registries on the check date",
+      note: "no match on the sanctions / PEP screen on the check date",
     });
   }
+  await repo.addCheck({
+    reportId: report.id,
+    quadrant: "risk",
+    key: "stolen_registry",
+    result: input.theftRegistryChecked ? "match" : "gap_held_open",
+    authorityState: input.theftRegistryChecked ? "resolved" : "missing",
+    sourceId: null,
+    note: input.theftRegistryChecked
+      ? "no match in the stolen-property register on the check date; certificate issued"
+      : "stolen-property register not checked — available as a paid add-on",
+  });
 
   const scoreInputs: ScoreInputs = {
     objectId: report.objectId,
@@ -311,6 +331,7 @@ export async function enrich(
     alrEnabled: false, // D5: Risk capped at 90
     withheldDisclosure: false,
     scaleFactor: SCALE_BY_CATEGORY[report.category] ?? 5,
+    theftRegistryChecked: input.theftRegistryChecked ?? false,
   };
 
   return { report, profile, scoreInputs };

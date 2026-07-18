@@ -170,6 +170,7 @@ export async function runProvisional(
       declaredAttributes: ing.declaredAttributes,
       resolvedAttributes: ing.resolvedAttributes,
       redFlags: ing.redFlags,
+      theftRegistryChecked: order.addons?.theftRegistry ?? false,
     },
   );
 
