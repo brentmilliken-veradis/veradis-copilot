@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { enrich, type EnrichAdapters, type EnrichInput } from "./enrich";
 import { InMemoryRepository } from "@/packages/data/in-memory";
 import { loadProfile } from "@/packages/profiles/loader";
-import { pcgsAdapter, numistaAdapter, type SourceScenario } from "@/packages/adapters/source";
+import { pcgsAdapter, numistaAdapter, type SourceScenario, type SourceAdapter, type ObjectResolution } from "@/packages/adapters/source";
 import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter, type GraphScenario } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter, type SanctionsScenario } from "@/packages/adapters/sanctions";
@@ -54,6 +54,47 @@ describe("enrich (E4)", () => {
     expect(yearCheck?.result).toBe("match");
     const cites = await repo.listCitations(report.id);
     expect(cites.some((c) => c.name === "PCGS" && c.tier === 1 && c.retrievalState === "retrieved")).toBe(true);
+  });
+
+  it("object-level Tier-1 resolution (Numista) closes every key it confirms, in one lookup", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    // A catalogue that resolves the whole coin at once and confirms 4 of 5 keys.
+    const numista: SourceAdapter = {
+      name: "Numista",
+      tier: 1,
+      role: "ground_truth",
+      categories: ["coins"],
+      async lookup() {
+        return { adapter: "Numista", tier: 1, role: "ground_truth", matched: false, name: "Numista", retrievalState: "pending" };
+      },
+      async resolveObject(): Promise<ObjectResolution> {
+        return {
+          matched: true,
+          sourceName: "Numista",
+          url: "https://en.numista.com/27776",
+          tier: 1,
+          confirmedKeys: { country: "Canada", year: "2007", denomination: "Proof Set", mint_mark: "RCM" },
+        };
+      },
+    };
+    const res = await enrich(
+      repo,
+      { sources: [numista], embedder: new StubEmbeddingAdapter(), graph: new StubGraphAdapter(), sanctions: new StubSanctionsAdapter() },
+      input(report, RESOLVED),
+    );
+
+    // Confirmed keys close at Tier-1 with full credit and a Numista citation.
+    for (const key of ["country", "year", "denomination", "mint_mark"]) {
+      expect(res.scoreInputs.identity.find((i) => i.key === key)).toMatchObject({ credit: 1.0, authorityState: "resolved" });
+    }
+    // The unconfirmed key stays honestly "observed" (declared), not resolved.
+    expect(res.scoreInputs.identity.find((i) => i.key === "variety")?.authorityState).toBe("declared");
+
+    const checks = await repo.listChecks(report.id);
+    expect(checks.find((c) => c.quadrant === "identity" && c.key === "country")?.result).toBe("match");
+    const cites = await repo.listCitations(report.id);
+    expect(cites.some((c) => c.name === "Numista" && c.tier === 1 && (c.url ?? "").includes("27776"))).toBe(true);
   });
 
   it("corroborates via corpus but never closes the check (Tier-2)", async () => {

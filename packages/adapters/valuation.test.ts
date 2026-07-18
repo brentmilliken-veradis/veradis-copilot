@@ -1,13 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseValuationJson, StubValuationAdapter, getValuationAdapter, ClaudeValuationAdapter } from "./valuation";
 
-const req = {
-  objectId: "obj-1",
-  category: "coins" as const,
-  currency: "CAD",
-  resolvedAttributes: { country: "Canada", year: "2004", denomination: "Dollar" },
-};
-
 describe("parseValuationJson", () => {
   it("parses a valid estimate and carries the currency through", () => {
     const est = parseValuationJson(
@@ -71,7 +64,7 @@ describe("parseValuationJson", () => {
 
 describe("StubValuationAdapter", () => {
   it("returns null — no engine band by default (F-8)", async () => {
-    expect(await new StubValuationAdapter().estimate(req)).toBeNull();
+    expect(await new StubValuationAdapter().estimate()).toBeNull();
   });
 });
 

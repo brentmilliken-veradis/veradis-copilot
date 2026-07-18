@@ -12,7 +12,7 @@ import type { Repository } from "@/packages/data/repository";
 import { getStorage, type Storage } from "@/packages/adapters/storage";
 import { getEmailer, type Emailer } from "@/packages/adapters/email";
 import { getVisionAdapter } from "@/packages/adapters/vision";
-import { pcgsAdapter, numistaAdapter } from "@/packages/adapters/source";
+import { pcgsAdapter, getNumistaAdapter } from "@/packages/adapters/source";
 import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
@@ -33,7 +33,8 @@ function buildAdapters(storage: Storage): PipelineAdapters {
   return {
     // Live vision needs the storage to load image bytes for Claude image blocks.
     vision: getVisionAdapter({}, storage),
-    sources: [pcgsAdapter(), numistaAdapter()],
+    // Real Numista (Tier-1 identity ground truth) when NUMISTA_API_KEY is set, else stub.
+    sources: [pcgsAdapter(), getNumistaAdapter()],
     embedder: new StubEmbeddingAdapter(),
     graph: new StubGraphAdapter(),
     sanctions: new StubSanctionsAdapter(),
