@@ -332,7 +332,7 @@ export class VeradisAccountsClient {
       `${this.url.replace(/\/$/, "")}/storage/v1/object/${REPORT_FILES_BUCKET}/${encodePath(path)}`,
       {
         method: "POST",
-        headers: { ...this.headers(), "content-type": "text/html", "x-upsert": "true" },
+        headers: { ...this.headers(), "content-type": "text/html; charset=utf-8", "x-upsert": "true" },
         body: html,
       },
     );
