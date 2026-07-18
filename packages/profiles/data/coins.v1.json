@@ -1,8 +1,8 @@
 {
   "category": "coins",
   "version": 1,
-  "calibration": "provisional",
-  "label": "Coins & banknotes",
+  "calibration": "calibrated",
+  "label": "Coins & banknotes (calibrated — PCGS/Numista Tier-1, RCM golden ladder)",
   "identityKeys": [
     { "key": "country", "label": "Country / issuer", "weight": 0.1 },
     { "key": "denomination", "label": "Denomination", "weight": 0.2 },

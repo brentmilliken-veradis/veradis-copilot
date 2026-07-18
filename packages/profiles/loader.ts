@@ -12,12 +12,13 @@ import watchesV1 from "./data/watches.v1.json";
 import artV1 from "./data/art.v1.json";
 import fineChinaV1 from "./data/fine-china.v1.json";
 
-/** Registry of built-in profiles. Every category ships `provisional` until its
- *  P2 calibration is validated (golden set + tuned CI). Coins and medals are
- *  structurally full with Tier-1 sources defined, but not yet calibration-
- *  validated; watches, art and fine-china are ADR-002 SCAFFOLDS, thin-sourced
- *  and uncalibrated. All run provisional/flagged, and none can present a
- *  confident tier or seal definitive before its P2 calibration lands. */
+/** Registry of built-in profiles. A category ships `provisional` (tier capped
+ *  to Flagged) until its calibration is validated — a golden set + a validated
+ *  real-object field-golden entry (see tests/golden/<cat>-calibration-v1.json).
+ *  COINS is calibrated: PCGS/Numista Tier-1 + the 2007 RCM golden ladder. Medals
+ *  is structurally full but not yet field-validated; watches, art and fine-china
+ *  are ADR-002 SCAFFOLDS, thin-sourced. All non-calibrated categories run
+ *  provisional/flagged and cannot seal definitive until their calibration lands. */
 const REGISTRY: CategoryProfile[] = [
   coinsV1 as CategoryProfile,
   medalsV1 as CategoryProfile,
