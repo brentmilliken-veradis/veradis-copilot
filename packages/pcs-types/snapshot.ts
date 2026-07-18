@@ -144,6 +144,14 @@ export interface ReportSnapshot {
    *  re-route. A capped report can never be confirmed to definitive. Omitted
    *  entirely when uncapped so calibrated-category hashes are unchanged. */
   capReason?: "uncalibrated_category" | "vision_reroute";
+  /** A1: set when a curator STEPPED DOWN the tier below the band its composite
+   *  implies (confirm.ts, verb='downgraded'). The composite is left intact —
+   *  so a bare `Math.round(composite)` would badge the HIGHER, un-downgraded
+   *  tier on the account card. The delivery bridge suppresses that bare number
+   *  the same way it suppresses a capped one (R-4); the HTML still carries the
+   *  sealed downgraded tier + the curator note. Omitted unless a real
+   *  step-down occurred, so non-downgraded hashes are unchanged. */
+  tierAdjusted?: true;
   /** Populated on v≥2 to render the evidence-ladder delta panel. */
   delta?: DeltaRow[];
 }

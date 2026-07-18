@@ -106,4 +106,22 @@ describe("confirmReport (E7)", () => {
     expect(res.version!.tier).toBe("silver");
     expect(res.version!.snapshotJson.score.tier).toBe("silver");
   });
+
+  it("A1: a real downgrade marks the snapshot tierAdjusted; the composite is left intact", async () => {
+    const repo = new InMemoryRepository();
+    const gold = buildCoin2007(2, { provisional: true }); // Gold
+    const { reportId } = await seedProvisional(repo, gold);
+    const res = await confirmReport(repo, { reportId, curator: "c", credentialClass: "external_expert", verb: "downgraded", downgradeTo: "silver" });
+    // The bridge reads this flag to suppress the un-downgraded bare score.
+    expect(res.version!.snapshotJson.tierAdjusted).toBe(true);
+    // Composite is deliberately unchanged — only the tier stepped down.
+    expect(res.version!.composite).toBe(gold.score.composite);
+  });
+
+  it("A1: a plain confirm (no step-down) never sets tierAdjusted", async () => {
+    const repo = new InMemoryRepository();
+    const { reportId } = await seedProvisional(repo, buildCoin2007(1, { provisional: true }));
+    const res = await confirmReport(repo, { reportId, curator: "c", credentialClass: "curator", verb: "confirmed" });
+    expect(res.version!.snapshotJson.tierAdjusted).toBeUndefined();
+  });
 });

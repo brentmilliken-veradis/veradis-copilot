@@ -84,11 +84,19 @@ export async function deliverReport(
   // account-template prefers a cap flag alongside the number, that lands on
   // their schema — coordinate before changing this to anything but omission.
   const capped = snapshot.capReason !== undefined;
+  // A1: a curator downgrade steps the tier below its composite band, so the
+  // bare Math.round(composite) would badge the HIGHER, un-downgraded tier —
+  // suppress it exactly like a capped score. The HTML file still carries the
+  // sealed downgraded tier + curator note.
+  const suppressScore = capped || snapshot.tierAdjusted === true;
   await accounts.updateReport(row.id, {
     status: "delivered",
     file_path: filePath,
-    pcs_score: !capped && version.composite != null ? Math.round(version.composite) : undefined,
-    valuation: hasBand ? `${val.currency} ${val.fmvLo}–${val.fmvHi}` : undefined,
+    pcs_score: !suppressScore && version.composite != null ? Math.round(version.composite) : undefined,
+    // A2 (defense-in-depth): a capped report can never be confirmed and so
+    // never carries an expert band — but cap-guard the valuation too, for
+    // symmetry with the score, so a cap can never leak a bare number either way.
+    valuation: !capped && hasBand ? `${val.currency} ${val.fmvLo}–${val.fmvHi}` : undefined,
     delivered_at: now(),
   });
 
