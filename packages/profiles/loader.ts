@@ -111,6 +111,13 @@ export function loadProfile(category: Category, version?: number): CategoryProfi
   return validateProfile(chosen);
 }
 
+/** True when a built-in profile serves this category. A `Category` value can map
+ *  (e.g. "cards" / "silver") without a profile existing yet — those cannot be
+ *  produced and must be refunded, not run. */
+export function categoryHasProfile(category: Category): boolean {
+  return REGISTRY.some((p) => p.category === category);
+}
+
 /** All built-in profiles (validated). */
 export function allProfiles(): CategoryProfile[] {
   return REGISTRY.map(validateProfile);

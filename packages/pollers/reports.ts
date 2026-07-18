@@ -17,9 +17,10 @@ import { DuplicateOrderError, type Order, type Repository } from "@/packages/dat
 import type { Storage } from "@/packages/adapters/storage";
 import type { Emailer } from "@/packages/adapters/email";
 import { normalizePhoto } from "@/packages/adapters/photos";
-import { deliverReport, type DeliveryTarget } from "@/packages/delivery/bridge";
+import { deliverReport, settleRefund, type DeliveryTarget } from "@/packages/delivery/bridge";
 import { runProvisional, type PipelineAdapters } from "@/packages/pipeline/run";
 import { toOrderIntake, type ParsedVeradisIntake } from "@/packages/intake/veradis";
+import { categoryHasProfile } from "@/packages/profiles/loader";
 import type { PhotoInput } from "@/packages/intake/types";
 import { sendCuratorReview } from "@/packages/notify/emails";
 
@@ -186,8 +187,11 @@ export async function processAccountsReport(
           : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
       }
       case "failed":
-        // Terminal — surfaced to the curator, never silently re-burnt.
-        return { reportId: row.id, outcome: "skipped", reason: `failed previously: ${existingOrder.lastError ?? "see logs"}` };
+        // Terminal — never re-burnt. Settle the paid row to `refunded` (idempotent;
+        // recovers a settlement that failed on the terminal tick) so it can never
+        // sit in_production forever.
+        await settleRefund(deps.accounts, row.id);
+        return { reportId: row.id, outcome: "refunded", reason: `production failed previously: ${existingOrder.lastError ?? "see logs"}` };
       case "producing": {
         const claimedAtMs = existingOrder.claimedAt ? Date.parse(existingOrder.claimedAt) : 0;
         if (now().getTime() - claimedAtMs < STALE_CLAIM_MS) {
@@ -198,7 +202,9 @@ export async function processAccountsReport(
             productionState: "failed",
             lastError: existingOrder.lastError ?? "max production attempts exhausted",
           });
-          return { reportId: row.id, outcome: "failed", reason: "max production attempts exhausted" };
+          // Terminal: settle the paid row to `refunded` so it never sits in_production.
+          await settleRefund(deps.accounts, row.id);
+          return { reportId: row.id, outcome: "refunded", reason: "max production attempts exhausted" };
         }
         // Crash recovery: reclaim the stale row via compare-and-swap (R-3) —
         // exactly one concurrent tick wins; the loser skips without a second
@@ -215,23 +221,40 @@ export async function processAccountsReport(
     }
   }
 
-  // Cheap reads BEFORE the claim — a row that can never produce is rejected
-  // without consuming an order row / attempt.
+  // Cheap reads BEFORE the claim — a row that can never produce is settled
+  // without consuming an order row / attempt. B2: a paid row that can never be
+  // fulfilled is refunded (never left in_production). The one exception is a
+  // cross-tenant mismatch (F-4): a data-integrity anomaly to investigate, NOT an
+  // auto-refund.
   const obj = await deps.accounts.getObject(row.object_id);
-  if (!obj) return { reportId: row.id, outcome: "failed", reason: `object ${row.object_id} not found` };
+  if (!obj) {
+    await settleRefund(deps.accounts, row.id);
+    return { reportId: row.id, outcome: "refunded", reason: `object ${row.object_id} not found` };
+  }
   // F-4: never produce/deliver across tenants — the report row's user must own
-  // the object it points at.
+  // the object it points at. Surfaced as a failure, never auto-refunded.
   if (obj.user_id !== row.user_id) {
     return { reportId: row.id, outcome: "failed", reason: "object/owner mismatch" };
   }
 
+  // A category we cannot serve (unmapped, or mapped to a type with no profile yet
+  // such as cards/silver) can never produce a report → refund at pre-claim, before
+  // burning any paid pipeline attempts.
   const category = mapAccountsCategory(obj.category);
-  if (!category) {
-    return { reportId: row.id, outcome: "skipped", reason: `unmapped category "${obj.category}"` };
+  if (!category || !categoryHasProfile(category)) {
+    await settleRefund(deps.accounts, row.id);
+    return {
+      reportId: row.id,
+      outcome: "refunded",
+      reason: category ? `no profile for category "${category}"` : `unmapped category "${obj.category}"`,
+    };
   }
 
   const profile = await deps.accounts.getProfile(row.user_id);
-  if (!profile?.email) return { reportId: row.id, outcome: "failed", reason: "collector profile/email not found" };
+  if (!profile?.email) {
+    await settleRefund(deps.accounts, row.id);
+    return { reportId: row.id, outcome: "refunded", reason: "collector profile/email not found" };
+  }
 
   const parsed: ParsedVeradisIntake = {
     reportId: row.id,
@@ -284,6 +307,13 @@ export async function processAccountsReport(
       lastError: message,
     });
     console.error(`report poller ${row.id}: production attempt ${order.attempts} failed:`, e);
+    if (terminal) {
+      // Permanent failure (e.g. no profile for the category, adapter down, no
+      // downloadable photos): settle the paid row to `refunded` so it never sits
+      // in_production forever (B1). Non-terminal failures stay for retry.
+      await settleRefund(deps.accounts, row.id);
+      return { reportId: row.id, outcome: "refunded", reason: `production failed terminally: ${message}` };
+    }
     return { reportId: row.id, outcome: "failed", reason: message };
   }
   await deps.repo.updateOrder(row.id, { productionState: "produced", lastError: null });
