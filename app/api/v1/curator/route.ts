@@ -43,6 +43,19 @@ export async function POST(request: Request) {
   }
 
   const { repo, emailer } = await getStore();
+
+  // FLAG-A: the account-template admin backend addresses a report by the
+  // ACCOUNTS reports.id (= copilot report.orderId), per interface contract C-1
+  // ("reportId": "<accounts reports.id>"). Resolve that to the copilot report;
+  // fall back to the copilot report.id so an in-copilot admin surface — which
+  // holds the internal id — also works. Either id resolves to one report
+  // (both are UUIDs; a cross-match is not possible in practice).
+  const target =
+    (await repo.getReportByOrderId(body.reportId)) ?? (await repo.getReport(body.reportId));
+  if (!target) {
+    return Response.json({ error: `report ${body.reportId} not found` }, { status: 404 });
+  }
+
   try {
     const res = await confirmReport(repo, {
       // R-1: the caller authenticated with the shared secret; the forwarded
@@ -50,7 +63,7 @@ export async function POST(request: Request) {
       // credentialClass is defaulted SERVER-side — never taken as authority.
       curator: `${body.curator ?? "Curator"} (auth: curator-shared-secret)`,
       credentialClass: body.credentialClass ?? "curator",
-      reportId: body.reportId,
+      reportId: target.id, // the copilot report.id confirmReport expects
       verb: body.verb,
       downgradeTo: body.downgradeTo,
       valuationBand: body.valuationBand,

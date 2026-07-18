@@ -24,6 +24,9 @@ describe("R-1 — curator route auth fails closed", () => {
   let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // Fresh seeded store per test — a confirming test seals the fixture to
+    // definitive, so isolation must reset the memoised singleton.
+    (globalThis as { __veradisStore?: unknown }).__veradisStore = undefined;
     fetchSpy = vi.fn(async () => {
       throw new Error("network must not be touched on a denied curator call");
     });
@@ -79,5 +82,32 @@ describe("R-1 — curator route auth fails closed", () => {
     expect(actions).toHaveLength(1);
     expect(actions[0].curator).toBe("Brent (auth: curator-shared-secret)");
     expect(actions[0].credentialClass).toBe("curator"); // server-side default
+  });
+
+  it("FLAG-A: resolves the accounts reports.id (= orderId) to the copilot report", async () => {
+    process.env.CURATOR_AUTH_SECRET = "cur-secret";
+    const { repo, seededReportId } = await getStore();
+
+    // Per contract C-1 the account-template sends the ACCOUNTS reports.id — in
+    // the in-memory seed that is the order id "seed-order", NOT the (internal)
+    // copilot report.id. The route must resolve it to the right report.
+    const res = await POST(req({ reportId: "seed-order", verb: "confirmed", curator: "Brent" }, "Bearer cur-secret"));
+
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { report: { id: string; status: string } };
+    expect(payload.report.status).toBe("definitive");
+    expect(payload.report.id).toBe(seededReportId); // resolved to the seeded report
+    expect(await repo.listCuratorActions(seededReportId)).toHaveLength(1);
+  });
+
+  it("FLAG-A: an id that matches neither orderId nor report.id → 404, no side effects", async () => {
+    process.env.CURATOR_AUTH_SECRET = "cur-secret";
+    const { repo, seededReportId } = await getStore();
+
+    const res = await POST(req({ reportId: "no-such-id", verb: "confirmed" }, "Bearer cur-secret"));
+
+    expect(res.status).toBe(404);
+    expect(await repo.listCuratorActions(seededReportId)).toHaveLength(0);
+    expect((await repo.getReport(seededReportId))?.status).toBe("provisional"); // untouched
   });
 });
