@@ -122,12 +122,28 @@ describe("deliverReport", () => {
     expect(out.reason).toMatch(/no veradis-accounts reports row/);
   });
 
-  it("refuses to deliver a refund state (unscored/withheld)", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    const out = await deliverReport(new VeradisAccountsClient(ACCOUNTS_URL, "key"), copilotReport("unscored"), version());
-    expect(out.delivered).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("settles a refund state (unscored/withheld) to `refunded` — no file, terminal status", async () => {
+    for (const status of ["unscored", "withheld"] as const) {
+      const calls: { url: string; init?: RequestInit }[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          calls.push({ url, init });
+          if (url.includes("/rest/v1/reports?") && (!init || !init.method)) {
+            return new Response(JSON.stringify([accountsRow]), { status: 200 });
+          }
+          return new Response("{}", { status: 200 });
+        }),
+      );
+      const client = new VeradisAccountsClient(ACCOUNTS_URL, "key");
+      const out = await deliverReport(client, copilotReport(status), version(), () => NOW);
+
+      expect(out).toEqual({ delivered: false, settled: "refunded" });
+      // Row read + a single PATCH to `refunded` — and NO report file uploaded.
+      const patch = JSON.parse(calls.find((c) => c.init?.method === "PATCH")!.init!.body as string);
+      expect(patch).toEqual({ status: "refunded" });
+      expect(calls.some((c) => c.url.includes("/storage/v1/object/report-files/"))).toBe(false);
+    }
   });
 
   it("delivers the definitive over the same path (upsert replaces the file)", async () => {

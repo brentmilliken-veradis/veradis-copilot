@@ -26,6 +26,7 @@ import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
 import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
 import { resetStubRegistry } from "@/packages/adapters/stub-registry";
+import { buildCoin2007 } from "@/packages/fixtures/coin-2007";
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 
@@ -153,10 +154,11 @@ describe("pollReports", () => {
     // Write-back landed on the collector's row.
     expect(accounts.uploads[0].reportId).toBe("rep-1");
     expect(accounts.uploads[0].html).toContain("Provenance Confidence Score");
-    expect(accounts.patches[0].patch.status).toBe("delivered");
+    const paintingPatch = accounts.patches[0].patch;
+    expect(paintingPatch.status).toBe("delivered");
     // R-4: a painting is an uncalibrated (capped) category — the structured
     // pcs_score is withheld; the delivered HTML carries the capped verdict.
-    expect(accounts.patches[0].patch.pcs_score).toBeUndefined();
+    if (paintingPatch.status === "delivered") expect(paintingPatch.pcs_score).toBeUndefined();
     expect(accounts.uploads[0].html).toContain("This category is not yet calibrated");
 
     // Copilot side: order (id = accounts report id) + provisional report + EMAIL B.
@@ -376,5 +378,48 @@ describe("pollReports", () => {
     expect(summary.results[0]).toMatchObject({ outcome: "failed", reason: "no photos downloadable" });
     expect(accounts.patches).toHaveLength(0);
     expect(accounts.queue[0].status).toBe("in_production");
+  });
+
+  it("R-8: a produced refund-state report (unscored) settles the accounts row to `refunded`", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts); // provides the in_production accounts row rep-1
+    const d = deps(accounts);
+
+    // A prior tick produced an UNSCORED report (thin evidence) but never
+    // settled the accounts row — it must not sit in_production forever.
+    await d.repo.createOrder({
+      id: "rep-1",
+      tallySubmissionId: "veradis:rep-1",
+      email: "collector@example.com",
+      ownerName: "Alex Collector",
+      category: "medals",
+      sku: "verify",
+      productionState: "produced",
+      attempts: 1,
+      claimedAt: "2026-07-17T12:00:00Z",
+    });
+    const report = await d.repo.createReport({ orderId: "rep-1", objectId: "obj-1", category: "medals" });
+    await d.repo.updateReport(report.id, { status: "unscored", currentVersion: 1 });
+    const snap = buildCoin2007(1, { provisional: true });
+    await d.repo.addReportVersion({
+      reportId: report.id,
+      v: 1,
+      snapshotJson: snap,
+      snapshotSha256: snap.snapshotSha256 ?? "sha",
+      supersedesSha256: null,
+      tier: "unscored",
+      composite: 49,
+      ciLo: 35,
+      ciHi: 64,
+      pdfPath: null,
+    });
+
+    const summary = await pollReports(d);
+
+    expect(summary.results[0].outcome).toBe("refunded");
+    expect(summary.refunded).toBe(1);
+    expect(accounts.patches.at(-1)?.patch.status).toBe("refunded");
+    expect(accounts.queue[0].status).toBe("refunded"); // no longer in_production
+    expect(accounts.uploads).toHaveLength(0); // no report file for a refund
   });
 });

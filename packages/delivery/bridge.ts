@@ -20,11 +20,20 @@ export interface DeliveryResult {
   delivered: boolean;
   filePath?: string;
   reason?: string;
+  /** Set when a refund-state report (unscored/withheld) resolved the accounts
+   *  row to a terminal `refunded` state instead of delivering. */
+  settled?: "refunded";
 }
 
 /** Only these copilot statuses are paid deliverables that belong on the
- *  collector's object. Unscored/withheld are refunds — nothing is delivered. */
+ *  collector's object. */
 const DELIVERABLE = new Set(["provisional", "definitive", "flagged"]);
+
+/** Unscored (indeterminate evidence) and withheld (curator refund) are NOT
+ *  deliverables — they resolve the customer's row to a terminal `refunded` so
+ *  it never sits in_production. The actual Stripe refund is the account-template's
+ *  action (see the CoPilot ↔ Account interface contract). */
+const REFUND_STATES = new Set(["unscored", "withheld"]);
 
 export async function deliverReport(
   accounts: DeliveryTarget | null,
@@ -32,7 +41,8 @@ export async function deliverReport(
   version: ReportVersion,
   now: () => string = () => new Date().toISOString(),
 ): Promise<DeliveryResult> {
-  if (!DELIVERABLE.has(report.status)) {
+  const isRefund = REFUND_STATES.has(report.status);
+  if (!isRefund && !DELIVERABLE.has(report.status)) {
     return { delivered: false, reason: `status ${report.status} is not a deliverable` };
   }
   if (!accounts) {
@@ -48,6 +58,15 @@ export async function deliverReport(
   // row) — a missing row means "nothing to bridge", not an error.
   const row = await accounts.getReport(report.orderId);
   if (!row) return { delivered: false, reason: `no veradis-accounts reports row ${report.orderId}` };
+
+  // A refund state settles the customer's row to a terminal `refunded` (no file,
+  // no score) so it never sits in_production. CoPilot only signals the terminal
+  // state — the account-template issues the Stripe refund against the row's
+  // stripe_payment_intent.
+  if (isRefund) {
+    await accounts.updateReport(row.id, { status: "refunded" });
+    return { delivered: false, settled: "refunded" };
+  }
 
   const snapshot = version.snapshotJson;
   const html = renderReport(snapshot);
