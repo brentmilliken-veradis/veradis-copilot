@@ -118,6 +118,22 @@ export async function enrich(
     if (declaredVal !== undefined && normv(declaredVal) === normv(v)) corroboratedAttributes[k] = v;
   }
 
+  // Object-level Tier-1 resolution (E4+): a catalogue that answers per-OBJECT
+  // (e.g. Numista) resolves the whole coin in ONE search; each confirmed key then
+  // closes its identity check in the loop below. Adapters without resolveObject
+  // (the stubs) are skipped — the per-key path still runs for them. Any failure
+  // returns null and the loop falls back to per-key / corpus / declared.
+  const objResolver = adapters.sources.find(
+    (a) => a.tier === 1 && a.categories.includes(report.category) && typeof a.resolveObject === "function",
+  );
+  const objRes = objResolver?.resolveObject
+    ? await objResolver.resolveObject({
+        attributes: resolvedAttributes,
+        category: report.category,
+        identityKeys: profile.identityKeys.map((k) => k.key),
+      })
+    : null;
+
   const identity: IdentityCheckInput[] = [];
   for (const idKey of profile.identityKeys) {
     const value = resolvedAttributes[idKey.key];
@@ -138,14 +154,28 @@ export async function enrich(
       const t1 = adapters.sources.find((a) => a.tier === 1 && a.categories.includes(report.category));
       citation = t1 ? { name: t1.name, retrievalState: "pending", tier: 1 } : null;
     } else {
-      const results = await routeLookup(adapters.sources, { key: idKey.key, value, category: report.category });
-      const resolved = results.find((r) => r.matched && r.tier === 1);
-      if (resolved) {
+      // Tier-1 first: an object-level catalogue confirmation (Numista) closes the
+      // key; otherwise the per-key source lookup (stubs / other Tier-1 adapters).
+      const catConfirmed = objRes?.matched ? objRes.confirmedKeys[idKey.key] : undefined;
+      let t1Name: string | undefined;
+      let t1Url: string | undefined;
+      if (catConfirmed !== undefined) {
+        t1Name = objRes!.sourceName;
+        t1Url = objRes!.url;
+      } else {
+        const results = await routeLookup(adapters.sources, { key: idKey.key, value, category: report.category });
+        const resolved = results.find((r) => r.matched && r.tier === 1);
+        if (resolved) {
+          t1Name = resolved.name;
+          t1Url = resolved.url;
+        }
+      }
+      if (t1Name) {
         authorityState = "resolved";
         credit = 1.0;
         present = true;
         result = correctedKeys.has(idKey.key) ? "corrected" : "match";
-        citation = { name: resolved.name, url: resolved.url, retrievalState: "retrieved", tier: 1 };
+        citation = { name: t1Name, url: t1Url, retrievalState: "retrieved", tier: 1 };
         corroboratedAttributes[idKey.key] = value; // Tier-1 closed it (R-2)
       } else {
         // Corpus corroboration (Tier 2–3) — cite, never close. A vision-added
