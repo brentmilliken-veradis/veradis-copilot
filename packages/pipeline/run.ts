@@ -223,7 +223,11 @@ export async function runProvisional(
       actions: [{ rank: 1, action: "Supply comparable-sale evidence to tighten the valuation", expectedBandEffect: "Narrows the FMV band" }],
       marketInterest: "modest",
     };
-    if (adapters.valuation) {
+    // Never attach a value to a FLAGGED report. A flagged tier means the object
+    // is not trustworthy as declared (likely-fake / identity mismatch, or an
+    // uncalibrated-category cap) — putting a market figure on it would imply a
+    // genuineness we have not established. It stays "under expert review".
+    if (adapters.valuation && presented.tier !== "flagged") {
       const notes = ing.resolvedAttributes.notes ?? ing.declaredAttributes.notes;
       const valueSignals = deriveProvenanceCustody(notes).signals.map((s) => s.label);
       let est = null;
