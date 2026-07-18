@@ -250,6 +250,30 @@ export class VeradisAccountsClient {
     return rows.length > 0;
   }
 
+  /** B3 (COORDINATE) — self-heal enrichment jobs stranded `running` by a crash
+   *  between claimJob (queued→running) and the terminal updateJob. Mirrors the
+   *  report poller's STALE_CLAIM_MS reclaim: any `running` job whose claim
+   *  (started_at) predates the cutoff is atomically flipped back to `queued` so
+   *  the next listQueuedJobs pass re-runs it. Race-safe — the conditional
+   *  filter (status=running AND started_at<cutoff) means only the first tick's
+   *  UPDATE matches; a concurrent tick re-evaluates against `queued` and
+   *  touches nothing. Uses only existing enrichment_jobs columns. Returns the
+   *  reclaimed rows (for logging). */
+  async reclaimStaleRunningJobs(cutoffIso: string): Promise<AccountsJobRow[]> {
+    return (await this.rest(
+      `enrichment_jobs?status=eq.running&started_at=lt.${encodeURIComponent(cutoffIso)}&select=id,user_id,object_id,kind,status,detail`,
+      {
+        method: "PATCH",
+        headers: { prefer: "return=representation" },
+        body: JSON.stringify({
+          status: "queued",
+          started_at: null,
+          detail: "auto-requeued: running claim went stale",
+        }),
+      },
+    )) as unknown as AccountsJobRow[];
+  }
+
   async insertEvent(e: AccountsEventInsert): Promise<void> {
     await this.rest("enrichment_events", { method: "POST", body: JSON.stringify(e) });
   }
