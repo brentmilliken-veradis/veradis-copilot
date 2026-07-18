@@ -189,7 +189,7 @@ describe("pollReports", () => {
     expect((await d.repo.listReports()).length).toBe(reportsBefore); // NOT re-produced
   });
 
-  it("skips unmapped categories and isolates per-row failures", async () => {
+  it("B2: refunds unfulfillable rows (unmapped category, missing object) and isolates per-row", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);
     // row with an unmappable category
@@ -205,11 +205,38 @@ describe("pollReports", () => {
 
     expect(summary.polled).toBe(3);
     expect(summary.delivered).toBe(1);
-    expect(summary.skipped).toBe(1);
-    expect(summary.failed).toBe(1);
+    expect(summary.refunded).toBe(2);
+    expect(summary.skipped).toBe(0);
+    expect(summary.failed).toBe(0);
     const byId = Object.fromEntries(summary.results.map((r) => [r.reportId, r]));
+    expect(byId["rep-2"].outcome).toBe("refunded");
     expect(byId["rep-2"].reason).toMatch(/unmapped category/);
+    expect(byId["rep-3"].outcome).toBe("refunded");
     expect(byId["rep-3"].reason).toMatch(/not found/);
+    // Neither unfulfillable row is left in_production — both settled to refunded.
+    expect(accounts.queue.find((r) => r.id === "rep-2")?.status).toBe("refunded");
+    expect(accounts.queue.find((r) => r.id === "rep-3")?.status).toBe("refunded");
+  });
+
+  it("B2: a mapped category with no profile (cards/silver) refunds at pre-claim — no attempt burnt", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts); // rep-1 painting delivers alongside
+    accounts.queue.push({ id: "rep-cards", user_id: "user-1", object_id: "obj-cards", type: "verify", status: "in_production" });
+    accounts.objects.set("obj-cards", {
+      id: "obj-cards", user_id: "user-1", title: "Rookie card", maker: null, year: null,
+      category: "Trading cards", notes: null, photo_paths: ["user-1/a.jpg"],
+    });
+    accounts.photos.set("user-1/a.jpg", JPEG);
+
+    const d = deps(accounts);
+    const summary = await pollReports(d);
+
+    const cards = summary.results.find((r) => r.reportId === "rep-cards");
+    expect(cards?.outcome).toBe("refunded");
+    expect(cards?.reason).toMatch(/no profile for category "cards"/);
+    expect(accounts.queue.find((r) => r.id === "rep-cards")?.status).toBe("refunded");
+    // Refunded at pre-claim → no copilot order, no paid pipeline attempt burnt.
+    expect(await d.repo.getOrder("rep-cards")).toBeNull();
   });
 
   it("R-5: delivery succeeds + curator email throws → the SWEEP re-sends exactly once", async () => {

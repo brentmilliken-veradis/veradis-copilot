@@ -20,6 +20,7 @@ import { normalizePhoto } from "@/packages/adapters/photos";
 import { deliverReport, settleRefund, type DeliveryTarget } from "@/packages/delivery/bridge";
 import { runProvisional, type PipelineAdapters } from "@/packages/pipeline/run";
 import { toOrderIntake, type ParsedVeradisIntake } from "@/packages/intake/veradis";
+import { categoryHasProfile } from "@/packages/profiles/loader";
 import type { PhotoInput } from "@/packages/intake/types";
 import { sendCuratorReview } from "@/packages/notify/emails";
 
@@ -220,23 +221,40 @@ export async function processAccountsReport(
     }
   }
 
-  // Cheap reads BEFORE the claim — a row that can never produce is rejected
-  // without consuming an order row / attempt.
+  // Cheap reads BEFORE the claim — a row that can never produce is settled
+  // without consuming an order row / attempt. B2: a paid row that can never be
+  // fulfilled is refunded (never left in_production). The one exception is a
+  // cross-tenant mismatch (F-4): a data-integrity anomaly to investigate, NOT an
+  // auto-refund.
   const obj = await deps.accounts.getObject(row.object_id);
-  if (!obj) return { reportId: row.id, outcome: "failed", reason: `object ${row.object_id} not found` };
+  if (!obj) {
+    await settleRefund(deps.accounts, row.id);
+    return { reportId: row.id, outcome: "refunded", reason: `object ${row.object_id} not found` };
+  }
   // F-4: never produce/deliver across tenants — the report row's user must own
-  // the object it points at.
+  // the object it points at. Surfaced as a failure, never auto-refunded.
   if (obj.user_id !== row.user_id) {
     return { reportId: row.id, outcome: "failed", reason: "object/owner mismatch" };
   }
 
+  // A category we cannot serve (unmapped, or mapped to a type with no profile yet
+  // such as cards/silver) can never produce a report → refund at pre-claim, before
+  // burning any paid pipeline attempts.
   const category = mapAccountsCategory(obj.category);
-  if (!category) {
-    return { reportId: row.id, outcome: "skipped", reason: `unmapped category "${obj.category}"` };
+  if (!category || !categoryHasProfile(category)) {
+    await settleRefund(deps.accounts, row.id);
+    return {
+      reportId: row.id,
+      outcome: "refunded",
+      reason: category ? `no profile for category "${category}"` : `unmapped category "${obj.category}"`,
+    };
   }
 
   const profile = await deps.accounts.getProfile(row.user_id);
-  if (!profile?.email) return { reportId: row.id, outcome: "failed", reason: "collector profile/email not found" };
+  if (!profile?.email) {
+    await settleRefund(deps.accounts, row.id);
+    return { reportId: row.id, outcome: "refunded", reason: "collector profile/email not found" };
+  }
 
   const parsed: ParsedVeradisIntake = {
     reportId: row.id,
