@@ -40,6 +40,9 @@ export interface EnrichAccounts extends ReportPollerAccounts {
   ): Promise<void>;
   /** Conditional queued→running claim; false = another tick owns it (F-5b). */
   claimJob(jobId: string, startedAt: string): Promise<boolean>;
+  /** B3: flip crash-stranded `running` jobs (claimed before cutoff) back to
+   *  `queued`; returns the reclaimed rows. */
+  reclaimStaleRunningJobs(cutoffIso: string): Promise<AccountsJobRow[]>;
   listObjects(userId: string): Promise<AccountsObjectRow[]>;
   listDeliveredAppraisals(userId: string): Promise<{ object_id: string; valuation: string | null }[]>;
   insertEvent(e: AccountsEventInsert): Promise<void>;
@@ -303,12 +306,30 @@ export interface EnrichSummary {
   done: number;
   failed: number;
   skipped: number;
+  /** B3: jobs recovered from a crash-stranded `running` state this tick. */
+  reclaimed: number;
   results: { jobId: string; kind: string; status: "done" | "failed" | "skipped"; detail: string }[];
 }
+
+/** B3: an enrichment job stranded `running` by a crash (between claimJob and
+ *  the terminal updateJob) is presumed dead after this window and re-queued.
+ *  Mirrors the report poller's STALE_CLAIM_MS. */
+export const STALE_RUNNING_MS = 15 * 60 * 1000;
 
 /** One cron tick: queued → (atomic claim) running → done | failed+detail. */
 export async function runEnrichmentJobs(deps: EnrichDeps): Promise<EnrichSummary> {
   const now = () => nowIso(deps);
+  // B3: recover crash-stranded `running` jobs BEFORE draining the queue, so a
+  // reclaimed job re-runs this same tick. A reclaim failure must never sink the
+  // tick (the queue drain below is independent).
+  let reclaimed = 0;
+  try {
+    const cutoff = new Date((deps.now ? deps.now() : new Date()).getTime() - STALE_RUNNING_MS).toISOString();
+    reclaimed = (await deps.accounts.reclaimStaleRunningJobs(cutoff)).length;
+    if (reclaimed) console.warn(`enrich writer: re-queued ${reclaimed} crash-stranded running job(s)`);
+  } catch (e) {
+    console.error("enrich writer: stale-running reclaim failed (tick continues):", e);
+  }
   const jobs = await deps.accounts.listQueuedJobs();
   const results: EnrichSummary["results"] = [];
   for (const job of jobs) {
@@ -334,6 +355,7 @@ export async function runEnrichmentJobs(deps: EnrichDeps): Promise<EnrichSummary
     done: results.filter((r) => r.status === "done").length,
     failed: results.filter((r) => r.status === "failed").length,
     skipped: results.filter((r) => r.status === "skipped").length,
+    reclaimed,
     results,
   };
 }

@@ -61,6 +61,17 @@ class FakeAccounts implements EnrichAccounts {
     this.jobPatches.push({ jobId, patch: { status: "running", started_at: startedAt } });
     return true;
   }
+  async reclaimStaleRunningJobs(cutoffIso: string): Promise<AccountsJobRow[]> {
+    // Conditional-PATCH semantics: only still-`running` jobs claimed before the
+    // cutoff flip back to queued (ISO strings compare chronologically).
+    const stale = this.jobs.filter((j) => j.status === "running" && (j.started_at ?? "") < cutoffIso);
+    for (const j of stale) {
+      j.status = "queued";
+      j.started_at = undefined;
+      this.jobPatches.push({ jobId: j.id, patch: { status: "queued", started_at: null } });
+    }
+    return stale.map((j) => ({ ...j }));
+  }
   async listObjects(userId: string) {
     return [...this.objects.values()].filter((o) => o.user_id === userId);
   }
@@ -313,6 +324,36 @@ describe("runEnrichmentJobs", () => {
     expect(accounts.objectPatches).toHaveLength(0);
     expect(accounts.events).toHaveLength(0);
     expect(accounts.reportPatches).toHaveLength(0); // their report row untouched
+  });
+
+  it("B3: a job stranded `running` by a crash is re-queued and re-run this tick", async () => {
+    const accounts = new FakeAccounts();
+    accounts.objects.set("a", obj("a", { title: "Kurland plate", maker: "KPM Berlin" }));
+    // Claimed running 20 min before NOW — past the 15 min STALE_RUNNING_MS.
+    const staleStart = new Date(Date.parse(NOW) - 20 * 60 * 1000).toISOString();
+    accounts.jobs.push({ id: "job-1", user_id: "user-1", object_id: "a", kind: "narrative", status: "running", started_at: staleStart, detail: null });
+
+    const summary = await runEnrichmentJobs(deps(accounts));
+
+    expect(summary.reclaimed).toBe(1);
+    expect(summary).toMatchObject({ done: 1, failed: 0 });
+    // The reclaimed job actually re-ran: its narrative landed.
+    expect(accounts.objectPatches.filter((p) => p.patch.narrative_html)).toHaveLength(1);
+    expect(accounts.jobs[0].status).toBe("done");
+  });
+
+  it("B3: a `running` job still inside the window is left untouched", async () => {
+    const accounts = new FakeAccounts();
+    accounts.objects.set("a", obj("a", { title: "Kurland plate", maker: "KPM Berlin" }));
+    const freshStart = new Date(Date.parse(NOW) - 60 * 1000).toISOString(); // 1 min ago
+    accounts.jobs.push({ id: "job-1", user_id: "user-1", object_id: "a", kind: "narrative", status: "running", started_at: freshStart, detail: null });
+
+    const summary = await runEnrichmentJobs(deps(accounts));
+
+    expect(summary.reclaimed).toBe(0);
+    expect(summary.polled).toBe(0); // nothing queued to drain
+    expect(accounts.jobs[0].status).toBe("running"); // still in flight, untouched
+    expect(accounts.objectPatches).toHaveLength(0);
   });
 
   it("F-10: relink on a NON-HEAD object links it to every other group member", async () => {
