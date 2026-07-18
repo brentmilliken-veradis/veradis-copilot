@@ -56,7 +56,7 @@ describe("VeradisAccountsClient", () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(`${URL_BASE}/storage/v1/object/report-files/user-1/rep-1.html`);
     const headers = init.headers as Record<string, string>;
-    expect(headers["content-type"]).toBe("text/html");
+    expect(headers["content-type"]).toBe("text/html; charset=utf-8");
     expect(headers["x-upsert"]).toBe("true");
   });
 

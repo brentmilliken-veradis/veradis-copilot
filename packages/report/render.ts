@@ -134,6 +134,57 @@ function attestation(s: ReportSnapshot): string {
     <p class="liability">${esc(LIABILITY_LINE)}</p></section>`;
 }
 
+// Self-contained, brand-styled stylesheet embedded in every report so the file
+// is a portable, professional artefact standalone (opened, downloaded, or
+// printed to PDF) — not a bare fragment that inherits nothing. Brand: Brass /
+// Forest / Ink, Instrument Serif/Sans + Inter.
+const REPORT_CSS = `
+:root{--brass:#A87D2E;--forest:#1A4533;--ink:#0F1F38;--paper:#F7F4EC;--card:#FFFFFF;--line:#E6DFD2;--muted:#6E6656;--flag:#B4642A}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.6;padding:32px 16px}
+.pcs-report{max-width:780px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:44px 48px;box-shadow:0 1px 3px rgba(15,31,56,.06),0 14px 44px rgba(15,31,56,.05)}
+.watermark{display:inline-block;margin:0 0 20px;padding:6px 14px;background:rgba(168,125,46,.10);color:var(--brass);border:1px solid rgba(168,125,46,.30);border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:6px}
+header h1{font-family:'Instrument Serif',Georgia,'Times New Roman',serif;font-weight:400;font-size:34px;line-height:1.15;margin:0 0 6px;color:var(--ink)}
+.owner{color:var(--muted);margin:0;font-size:14px}
+.meta p{color:var(--muted);font-size:12.5px;margin:14px 0 0}
+h2{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:600;font-size:19px;color:var(--forest);margin:34px 0 12px;letter-spacing:-.01em}
+h3{font-family:'Instrument Sans',system-ui,sans-serif;font-weight:600;font-size:15px;color:var(--ink);margin:22px 0 8px}
+p{margin:0 0 12px}
+a{color:var(--brass);text-decoration:none}a:hover{text-decoration:underline}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:rgba(15,31,56,.05);padding:2px 6px;border-radius:5px;word-break:break-all}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+th{text-align:left;font-family:'Instrument Sans',system-ui,sans-serif;font-weight:600;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border-bottom:1.5px solid var(--line);padding:8px 12px 8px 0}
+td{padding:9px 12px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.hash{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+.verdict{background:linear-gradient(180deg,rgba(26,69,51,.045),rgba(26,69,51,0));border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-top:26px}
+.verdict h2{margin-top:0}
+.score{margin:2px 0 6px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.pcs-num{font-family:'Instrument Sans',system-ui,sans-serif;font-size:52px;font-weight:700;line-height:1;color:var(--forest)}
+.pcs-ci{color:var(--muted);font-size:13px}
+.tier{font-weight:600;margin:0 0 6px}
+.tier .lb{font-weight:400;color:var(--muted);font-size:13px}
+.tier-flagged{color:var(--flag)}.tier-gold{color:var(--brass)}.tier-silver{color:#7A7A82}.tier-bronze{color:#8A5A2B}
+.cap-note{background:rgba(180,100,42,.08);border-left:3px solid var(--flag);border-radius:0 8px 8px 0;padding:10px 14px;font-size:13.5px;margin:12px 0}
+.bars td{font-variant-numeric:tabular-nums}
+.bars td:last-child{text-align:right;font-weight:600;width:64px}
+.wt{color:var(--muted);font-size:12px;font-weight:400}
+.arith{color:var(--muted);font-size:12.5px;font-family:ui-monospace,monospace}
+.fmv{font-family:'Instrument Sans',sans-serif;font-size:26px;font-weight:700;color:var(--forest);margin:6px 0 14px}
+.fmv-pending{font-style:italic;color:var(--muted);margin:6px 0 14px}
+.actions{padding-left:18px}.actions li{margin:6px 0}.eff{color:var(--muted);font-size:12.5px}
+.caveat,.independence,.staleness{color:var(--muted);font-size:13px}
+.verify{background:rgba(15,31,56,.03);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.qr{width:56px;height:56px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;flex:0 0 auto}
+.repro,.falsif,.liability{color:var(--muted);font-size:12.5px}
+.reading-guide p{color:var(--muted);font-size:13px}
+footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px;text-align:center}
+@media print{body{background:#fff;padding:0}.pcs-report{box-shadow:none;border:none;max-width:none;padding:0}}
+@media (max-width:560px){.pcs-report{padding:26px 20px}header h1{font-size:27px}.pcs-num{font-size:42px}}
+`;
+
 export function renderReport(s: ReportSnapshot): string {
   const watermark = s.provisional
     ? `<div class="watermark">Provisional — under expert review</div>`
@@ -141,7 +192,7 @@ export function renderReport(s: ReportSnapshot): string {
   const registrySweep = `<section class="registry"><h3>Registry sweep</h3>
     <p>${esc(ALR_COVERAGE_LINE)}</p><p class="caveat">${esc(REGISTRY_CAVEAT)}</p></section>`;
 
-  return `<article class="pcs-report tier-${s.score.tier}">
+  const article = `<article class="pcs-report tier-${s.score.tier}">
   ${watermark}
   <header><h1>${esc(s.object.title)}</h1>
     <p class="owner">${esc(s.object.ownerFacingName)}</p></header>
@@ -164,4 +215,21 @@ export function renderReport(s: ReportSnapshot): string {
     <p>Gold/Silver/Bronze are tiered on the lower bound of the 95% confidence interval. Gaps are disclosed, not hidden.</p></section>
   <footer><p>Method ${esc(s.methodVersion)} · veradis.ai · The trust layer for everything physical.</p></footer>
 </article>`;
+
+  const lang = esc((s.meta.ownerLocale || "en").split("-")[0] || "en");
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(s.object.title)} — veradis report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>${REPORT_CSS}</style>
+</head>
+<body>
+${article}
+</body>
+</html>`;
 }
