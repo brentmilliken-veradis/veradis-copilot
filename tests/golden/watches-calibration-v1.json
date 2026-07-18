@@ -1,0 +1,45 @@
+{
+  "category": "watches",
+  "version": 1,
+  "binding": "Scenario B (count-based n_eff), HoI-ratified 13 Jul 2026 — see docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md. ANCHORS mirror the watch cases of tests/golden/pcs-golden-v21.json (Method v21 §12), asserted at the watches scaleFactor (10). They prove the deterministic engine reproduces known watch tiers to the digit. FIELD_GOLDEN are real objects run end-to-end through watches.v1.json → enrich → score, each with an expert-assigned ground-truth tier; a category is only honestly 'calibrated' once its field_golden set validates.",
+  "scale_factor": 10,
+  "anchors": [
+    {
+      "id": "12.1",
+      "name": "AP Royal Oak 5516",
+      "raws": { "identity": 96, "custody": 91, "material": 95, "risk": 90 },
+      "materialMissingWeight": 0.1,
+      "checkCounts": { "identity": 7, "custody": 4, "material": 4, "risk": 1 },
+      "expected": { "composite": 93.35, "ci": { "lo": 86.75, "hi": 96.06 }, "tier": "gold" }
+    },
+    {
+      "id": "12.2",
+      "name": "Omega Speedmaster 145.022",
+      "raws": { "identity": 98, "custody": 64, "material": 92, "risk": 90 },
+      "checkCounts": { "identity": 7, "custody": 5, "material": 5, "risk": 1 },
+      "expected": { "composite": 85.1, "ci": { "lo": 78.29, "hi": 89.01 }, "tier": "silver" }
+    },
+    {
+      "id": "12.5",
+      "name": "Rolex Submariner 5513",
+      "raws": { "identity": 94, "custody": 58, "material": 85, "risk": 90 },
+      "checkCounts": { "identity": 7, "custody": 6, "material": 5, "risk": 1 },
+      "expected": { "composite": 80.35, "ci": { "lo": 73.36, "hi": 84.69 }, "tier": "silver" }
+    },
+    {
+      "id": "12.6",
+      "name": "Tudor Submariner 7928",
+      "raws": { "identity": 58, "custody": 51, "material": 65, "risk": 90 },
+      "checkCounts": { "identity": 7, "custody": 3, "material": 5, "risk": 1 },
+      "expected": { "composite": 62.45, "ci": { "lo": 53.98, "hi": 69.1 }, "tier": "bronze" }
+    },
+    {
+      "id": "12.7",
+      "name": "fake Daytona 6263",
+      "raws": { "identity": 28, "custody": 22, "material": 0, "risk": 90 },
+      "checkCounts": { "identity": 4, "custody": 2, "material": 5, "risk": 1 },
+      "expected": { "composite": 28.5, "ci": { "lo": 21.8, "hi": 36.54 }, "tier": "flagged" }
+    }
+  ],
+  "field_golden": []
+}
