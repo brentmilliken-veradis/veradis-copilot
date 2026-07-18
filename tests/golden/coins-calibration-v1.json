@@ -1,0 +1,27 @@
+{
+  "category": "coins",
+  "version": 1,
+  "binding": "Scenario B (count-based n_eff), HoI-ratified 13 Jul 2026. ANCHORS are the canonical 2007 Royal Canadian Mint proof set (fixture PCS-CA-2026-0007), the v01→v02 evidence ladder — Silver when custody is thin, Gold once provenance is supplied — reproduced to the digit at the coins scaleFactor (10). They prove the deterministic engine on a known coin. The scorer's ability to FLAG a fake is proven category-independently by the §12 golden (fake Daytona → Flagged); the coins-specific negative is a field_golden obligation. FIELD_GOLDEN are real coins run end-to-end through coins.v1.json → enrich → score, each with an expert-assigned tier and a named ground-truth source (must include a known-fake); a category is only honestly 'calibrated' once its field_golden set validates.",
+  "scale_factor": 10,
+  "object_id": "PCS-CA-2026-0007",
+  "check_counts": { "identity": 5, "custody": 1, "material": 2, "risk": 1 },
+  "anchors": [
+    {
+      "id": "RCM-2007.v1",
+      "name": "2007 RCM proof set — custody thin (v01)",
+      "snapshot_ts": "2026-07-12T00:00:00Z",
+      "raws": { "identity": 95, "custody": 64, "material": 95, "risk": 90 },
+      "material_missing_weight": 0,
+      "expected": { "composite": 84.95, "ci": { "lo": 73.4, "hi": 91.82 }, "tier": "silver" }
+    },
+    {
+      "id": "RCM-2007.v2",
+      "name": "2007 RCM proof set — provenance supplied (v02)",
+      "snapshot_ts": "2026-07-12T00:00:00Z#v2",
+      "raws": { "identity": 95, "custody": 91, "material": 95, "risk": 90 },
+      "material_missing_weight": 0,
+      "expected": { "composite": 93.05, "ci": { "lo": 82.27, "hi": 96.37 }, "tier": "gold" }
+    }
+  ],
+  "field_golden": []
+}
