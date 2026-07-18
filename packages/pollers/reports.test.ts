@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   declaredAttributesFor,
   mapAccountsCategory,
+  MAX_DELIVERY_ATTEMPTS,
   pollReports,
   processAccountsReport,
   type ReportPollerAccounts,
@@ -476,5 +477,66 @@ describe("pollReports", () => {
     expect(summary.results[0].outcome).toBe("refunded");
     expect(accounts.queue[0].status).toBe("refunded");
     expect((await d.repo.listReports()).length).toBe(0); // not re-produced
+  });
+
+  /** Seed a produced report whose delivery is one PATCH short of the cap, with
+   *  the accounts write-back down (the terminal `delivered` PATCH throws). */
+  async function seedProducedWithFailingDelivery(d: ReportPollerDeps, accounts: FakeAccounts, deliveryAttempts: number) {
+    await d.repo.createOrder({
+      id: "rep-1",
+      tallySubmissionId: "veradis:rep-1",
+      email: "collector@example.com",
+      ownerName: "Alex Collector",
+      category: "art",
+      sku: "verify",
+      productionState: "produced",
+      attempts: 1,
+      deliveryAttempts,
+    });
+    const report = await d.repo.createReport({ orderId: "rep-1", objectId: "obj-1", category: "art" });
+    await d.repo.updateReport(report.id, { status: "provisional", currentVersion: 1 });
+    const snap = buildCoin2007(1, { provisional: true });
+    await d.repo.addReportVersion({
+      reportId: report.id, v: 1, snapshotJson: snap, snapshotSha256: snap.snapshotSha256 ?? "sha",
+      supersedesSha256: null, tier: "bronze", composite: 55, ciLo: 45, ciHi: 65, pdfPath: null,
+    });
+    // The write-back is down: the terminal PATCH to `delivered` throws; the
+    // `refunded` settlement PATCH still succeeds.
+    const orig = accounts.updateReport.bind(accounts);
+    accounts.updateReport = async (reportId, patch) => {
+      if (patch.status === "delivered") throw new Error("accounts write-back 503");
+      return orig(reportId, patch);
+    };
+  }
+
+  it("B4: a produced report whose delivery keeps failing is capped, then settled to `refunded`", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts); // rep-1 in_production + obj-1
+    const d = deps(accounts);
+    await seedProducedWithFailingDelivery(d, accounts, MAX_DELIVERY_ATTEMPTS - 1); // this tick hits the cap
+
+    const summary = await pollReports(d);
+
+    expect(summary.results[0].outcome).toBe("refunded");
+    expect(summary.refunded).toBe(1);
+    expect(accounts.queue[0].status).toBe("refunded"); // paid row no longer in_production
+    const order = await d.repo.getOrder("rep-1");
+    expect(order?.productionState).toBe("failed");
+    expect(order?.deliveryAttempts).toBe(MAX_DELIVERY_ATTEMPTS);
+  });
+
+  it("B4: a produced delivery failure below the cap just increments and stays in_production", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts);
+    const d = deps(accounts);
+    await seedProducedWithFailingDelivery(d, accounts, 0);
+
+    const summary = await pollReports(d);
+
+    expect(summary.results[0].outcome).toBe("produced_not_delivered");
+    expect(summary.refunded).toBe(0);
+    expect(accounts.queue[0].status).toBe("in_production"); // still queued for retry
+    expect((await d.repo.getOrder("rep-1"))?.deliveryAttempts).toBe(1);
+    expect((await d.repo.getOrder("rep-1"))?.productionState).toBe("produced"); // not given up yet
   });
 });

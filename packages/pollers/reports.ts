@@ -149,6 +149,42 @@ async function downloadPhotos(deps: ReportPollerDeps, obj: AccountsObjectRow): P
 export const MAX_PRODUCTION_ATTEMPTS = 3;
 /** F-5a: a 'producing' claim older than this is presumed crashed → reclaim. */
 export const STALE_CLAIM_MS = 15 * 60 * 1000;
+/** B4: delivery (accounts write-back) retries on an already-produced order
+ *  before we give up. Production is capped by MAX_PRODUCTION_ATTEMPTS; delivery
+ *  had no cap, so a permanently-failing write-back retried every tick forever. */
+export const MAX_DELIVERY_ATTEMPTS = 5;
+
+/** B4: a produced report whose delivery keeps failing (accounts unreachable or
+ *  rejecting the write) must not retry on every tick indefinitely. Bump
+ *  orders.delivery_attempts; at the cap, give up — mark the order failed, settle
+ *  the paid row to `refunded` (never leave it in_production), and escalate. */
+async function boundDeliveryRetry(
+  deps: ReportPollerDeps,
+  row: AccountsReportRow,
+  order: Order,
+  tier: string | undefined,
+  reason: string,
+): Promise<ProcessedReport> {
+  const deliveryAttempts = (order.deliveryAttempts ?? 0) + 1;
+  if (deliveryAttempts >= MAX_DELIVERY_ATTEMPTS) {
+    await deps.repo.updateOrder(row.id, {
+      productionState: "failed",
+      deliveryAttempts,
+      lastError: `delivery unrecoverable after ${deliveryAttempts} attempts: ${reason}`,
+    });
+    // Never leave the paid row in_production — settle it to refunded (B1/B2).
+    await settleRefund(deps.accounts, row.id);
+    console.error(`report poller ${row.id}: delivery gave up after ${deliveryAttempts} attempts (${reason}) — settled refunded`);
+    return { reportId: row.id, outcome: "refunded", tier, reason: `delivery unrecoverable: ${reason}` };
+  }
+  await deps.repo.updateOrder(row.id, { deliveryAttempts });
+  return {
+    reportId: row.id,
+    outcome: "produced_not_delivered",
+    tier,
+    reason: `delivery retry ${deliveryAttempts}/${MAX_DELIVERY_ATTEMPTS}: ${reason}`,
+  };
+}
 
 /** Produce + deliver one queued accounts report. Also used by the enrich
  *  writer's `reverify` job (the reverify endpoint pre-inserts the row).
@@ -173,18 +209,29 @@ export async function processAccountsReport(
         if (!copilotReport || !version) {
           return { reportId: row.id, outcome: "failed", reason: "order exists but no copilot report/version" };
         }
-        const redo = await deliverReport(deps.accounts, copilotReport, version);
         // (Curator-email recovery lives in sweepCuratorEmails — R-5. This
         // branch only fires while the accounts row is still in_production, so
         // it could never heal an email lost AFTER a successful delivery.)
+        let redo;
+        try {
+          redo = await deliverReport(deps.accounts, copilotReport, version);
+        } catch (e) {
+          // B4: delivery THREW (accounts unreachable / rejected the PATCH) —
+          // the common unbounded-retry vector. Bound it rather than re-raising
+          // to a per-tick failure that never gives up.
+          return boundDeliveryRetry(deps, row, existingOrder, version.tier ?? undefined, (e as Error).message);
+        }
         if (redo.settled === "refunded") {
           // A produced refund-state report (e.g. unscored) that never settled
           // last tick now resolves the accounts row to `refunded`.
           return { reportId: row.id, outcome: "refunded", tier: version.tier ?? undefined, reason: "settled: refunded" };
         }
-        return redo.delivered
-          ? { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" }
-          : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
+        if (redo.delivered) {
+          return { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" };
+        }
+        // B4: produced, delivery returned not-delivered (e.g. the accounts row
+        // vanished) — bound the retries the same way.
+        return boundDeliveryRetry(deps, row, existingOrder, version.tier ?? undefined, redo.reason ?? "not delivered");
       }
       case "failed":
         // Terminal — never re-burnt. Settle the paid row to `refunded` (idempotent;

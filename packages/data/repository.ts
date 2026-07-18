@@ -96,7 +96,7 @@ export interface Repository {
   getOrderByTallySubmission(submissionId: string): Promise<Order | null>;
   updateOrder(
     orderId: string,
-    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError" | "deliveryAttempts">>,
   ): Promise<Order>;
   /** R-3: compare-and-swap reclaim of a stale 'producing' claim. Takes the row
    *  ONLY when productionState is still 'producing' AND (claimedAt, attempts)
@@ -129,12 +129,20 @@ export interface Order {
   attempts: number;
   claimedAt: string | null;
   lastError: string | null;
+  /** B4: delivery (veradis-accounts write-back) retries after a report is
+   *  produced. Production is capped by `attempts`; this caps delivery, so a
+   *  permanently-failing write-back can't retry every tick forever. */
+  deliveryAttempts: number;
 }
 
-export type NewOrder = Omit<Order, "createdAt" | "productionState" | "attempts" | "claimedAt" | "lastError"> & {
+export type NewOrder = Omit<
+  Order,
+  "createdAt" | "productionState" | "attempts" | "claimedAt" | "lastError" | "deliveryAttempts"
+> & {
   productionState?: Order["productionState"];
   attempts?: number;
   claimedAt?: string | null;
+  deliveryAttempts?: number;
 };
 
 /** createOrder on an existing id — the losing side of an atomic claim. */
