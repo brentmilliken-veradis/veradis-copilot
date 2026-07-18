@@ -186,6 +186,7 @@ const mapOrder = (r: Row): Order => ({
   attempts: Number(r.attempts ?? 0),
   claimedAt: r.claimed_at == null ? null : s(r.claimed_at),
   lastError: r.last_error == null ? null : s(r.last_error),
+  deliveryAttempts: Number(r.delivery_attempts ?? 0),
 });
 
 const mapEmail = (r: Row): EmailRecord => ({
@@ -473,7 +474,7 @@ export class SupabaseRepository implements Repository {
     return (await this.rest(`corpus_chunk?corpus_document_id=in.(${ids})`)).map(mapCorpusChunk);
   }
 
-  // orders (migrations 0002 + 0003)
+  // orders (migrations 0002 + 0003 + 0004)
   async createOrder(input: NewOrder): Promise<Order> {
     try {
       return mapOrder(
@@ -487,6 +488,7 @@ export class SupabaseRepository implements Repository {
           ...(input.productionState !== undefined ? { production_state: input.productionState } : {}),
           ...(input.attempts !== undefined ? { attempts: input.attempts } : {}),
           ...(input.claimedAt !== undefined ? { claimed_at: input.claimedAt } : {}),
+          ...(input.deliveryAttempts !== undefined ? { delivery_attempts: input.deliveryAttempts } : {}),
         }),
       );
     } catch (e) {
@@ -498,13 +500,14 @@ export class SupabaseRepository implements Repository {
 
   async updateOrder(
     orderId: string,
-    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError" | "deliveryAttempts">>,
   ): Promise<Order> {
     const row: Row = {};
     if (patch.productionState !== undefined) row.production_state = patch.productionState;
     if (patch.attempts !== undefined) row.attempts = patch.attempts;
     if (patch.claimedAt !== undefined) row.claimed_at = patch.claimedAt;
     if (patch.lastError !== undefined) row.last_error = patch.lastError;
+    if (patch.deliveryAttempts !== undefined) row.delivery_attempts = patch.deliveryAttempts;
     const rows = await this.rest(`orders?id=eq.${encodeURIComponent(orderId)}`, {
       method: "PATCH",
       body: JSON.stringify(row),

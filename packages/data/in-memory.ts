@@ -72,6 +72,7 @@ export class InMemoryRepository implements Repository {
       attempts: input.attempts ?? 0,
       claimedAt: input.claimedAt ?? null,
       lastError: null,
+      deliveryAttempts: input.deliveryAttempts ?? 0,
     };
     this.orders.set(order.id, order);
     return { ...order };
@@ -84,7 +85,7 @@ export class InMemoryRepository implements Repository {
 
   async updateOrder(
     orderId: string,
-    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError">>,
+    patch: Partial<Pick<Order, "productionState" | "attempts" | "claimedAt" | "lastError" | "deliveryAttempts">>,
   ): Promise<Order> {
     const o = this.orders.get(orderId);
     if (!o) throw new Error(`order ${orderId} not found`);
