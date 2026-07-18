@@ -288,7 +288,7 @@ describe("pollReports", () => {
     expect((await d.repo.listReports()).length).toBe(reportsBefore);
   });
 
-  it("F-5a: a stale 'producing' claim is reclaimed; attempts exhaust to terminal failed", async () => {
+  it("F-5a/B1: attempts exhaust to terminal failed → the accounts row settles to `refunded`", async () => {
     const accounts = new FakeAccounts();
     seedPainting(accounts);
     const d = deps(accounts);
@@ -301,25 +301,28 @@ describe("pollReports", () => {
 
     const t0 = Date.parse("2026-07-17T12:00:00Z");
     d.now = () => new Date(t0);
-    await pollReports(d); // attempt 1 fails
+    await pollReports(d); // attempt 1 fails (non-terminal)
 
     d.now = () => new Date(t0 + 16 * 60 * 1000); // past the staleness window
     const second = await pollReports(d); // reclaim → attempt 2 fails
     expect(second.results[0].outcome).toBe("failed");
     expect((await d.repo.getOrder("rep-1"))?.attempts).toBe(2);
+    expect(accounts.queue[0].status).toBe("in_production"); // not yet terminal
 
     d.now = () => new Date(t0 + 32 * 60 * 1000);
-    const third = await pollReports(d); // attempt 3 fails → terminal
-    expect(third.results[0].outcome).toBe("failed");
+    const third = await pollReports(d); // attempt 3 fails → terminal → refunded
+    expect(third.results[0].outcome).toBe("refunded");
+    expect(third.refunded).toBe(1);
     const order = await d.repo.getOrder("rep-1");
     expect(order?.attempts).toBe(3);
-    expect(order?.productionState).toBe("failed");
+    expect(order?.productionState).toBe("failed"); // copilot order records the failure
+    expect(accounts.queue[0].status).toBe("refunded"); // paid row no longer stuck
+    expect(accounts.uploads).toHaveLength(0); // nothing delivered
 
-    // And from then on the row is surfaced, not retried.
+    // The row has left the in_production queue — nothing more to process.
     d.now = () => new Date(t0 + 48 * 60 * 1000);
     const fourth = await pollReports(d);
-    expect(fourth.results[0].outcome).toBe("skipped");
-    expect(fourth.results[0].reason).toMatch(/failed previously/);
+    expect(fourth.polled).toBe(0);
   });
 
   it("R-3: two concurrent ticks over the same STALE claim — exactly one re-runs production", async () => {
@@ -421,5 +424,30 @@ describe("pollReports", () => {
     expect(accounts.patches.at(-1)?.patch.status).toBe("refunded");
     expect(accounts.queue[0].status).toBe("refunded"); // no longer in_production
     expect(accounts.uploads).toHaveLength(0); // no report file for a refund
+  });
+
+  it("B1: a previously-failed order whose accounts row is still in_production is recovered to `refunded`", async () => {
+    const accounts = new FakeAccounts();
+    seedPainting(accounts); // rep-1 in_production
+    const d = deps(accounts);
+    // A prior terminal failure whose accounts settlement never landed (e.g. accounts
+    // was briefly unreachable): the copilot order is `failed`, the paid row is still
+    // in_production. The next tick must recover it — settle to refunded, not skip.
+    await d.repo.createOrder({
+      id: "rep-1",
+      tallySubmissionId: "veradis:rep-1",
+      email: "collector@example.com",
+      ownerName: "Alex Collector",
+      category: "art",
+      sku: "verify",
+      productionState: "failed",
+      attempts: 3,
+    });
+
+    const summary = await pollReports(d);
+
+    expect(summary.results[0].outcome).toBe("refunded");
+    expect(accounts.queue[0].status).toBe("refunded");
+    expect((await d.repo.listReports()).length).toBe(0); // not re-produced
   });
 });

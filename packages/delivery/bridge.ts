@@ -94,3 +94,15 @@ export async function deliverReport(
 
   return { delivered: true, filePath };
 }
+
+/** Settle a paid accounts row to a terminal `refunded` — used when a report can
+ *  NEVER be produced (a terminal production failure) so the row never sits in
+ *  in_production forever. Idempotent; returns false when there is no client or no
+ *  row. The Stripe refund is the account-template's action (contract C-3). */
+export async function settleRefund(accounts: DeliveryTarget | null, reportId: string): Promise<boolean> {
+  if (!accounts) return false;
+  const row = await accounts.getReport(reportId);
+  if (!row) return false;
+  await accounts.updateReport(row.id, { status: "refunded" });
+  return true;
+}
