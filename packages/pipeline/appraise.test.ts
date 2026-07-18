@@ -36,6 +36,8 @@ function adapters(): PipelineAdapters {
 // confirm/band mechanism against a calibrated profile override. No shipped
 // category is calibrated — the loader.test.ts guard enforces that.
 const calibratedCoins = (): CategoryProfile => ({ ...loadProfile("coins"), calibration: "calibrated" });
+// The inverse: a provisional profile forces the F-1 cap → presented tier flagged.
+const provisionalCoins = (): CategoryProfile => ({ ...loadProfile("coins"), calibration: "provisional" });
 
 function appraiseOrder(): OrderIntake {
   return {
@@ -169,6 +171,20 @@ describe("F-8 indicative mode — a labelled machine estimate, score untouched",
     expect(html).toContain("Market interest: modest");
     expect(html).not.toContain("Indicative value — under expert review"); // the valuation-pending line is gone (the provisional watermark is a separate line)
     expect(html.toLowerCase()).not.toContain("certified appraisal</h"); // ceiling: never a certified-appraisal header
+  });
+
+  it("suppresses the indicative band on a FLAGGED report — no value on an untrusted object", async () => {
+    const res = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters(), valuation: fakeValuation(EST) },
+      appraiseOrder(),
+      { profile: provisionalCoins() },
+    );
+    expect(res.score.tier).toBe("flagged"); // F-1 cap
+    expect(res.snapshot.valuation!.fmvLo).toBeUndefined(); // no band despite an active adapter
+    expect(res.snapshot.valuation!.indicative).toBeFalsy();
+    expect(renderReport(res.snapshot)).toContain("Indicative value — under expert review");
   });
 
   it("a null estimate degrades to the F-8 default — no band, 'under expert review'", async () => {
