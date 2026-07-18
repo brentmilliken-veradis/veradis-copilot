@@ -1,0 +1,36 @@
+{
+  "category": "jewellery",
+  "version": 1,
+  "calibration": "provisional",
+  "label": "Jewellery (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "identityKeys": [
+    { "key": "maker", "label": "Maker / house", "weight": 0.25 },
+    { "key": "signature_hallmark", "label": "Signature / hallmark", "weight": 0.25 },
+    { "key": "metal", "label": "Metal & purity", "weight": 0.15 },
+    { "key": "gemstone", "label": "Principal gemstone", "weight": 0.2 },
+    { "key": "model_collection", "label": "Model / collection", "weight": 0.15 }
+  ],
+  "captureSlots": [
+    { "slotId": "signature_macro", "label": "Signature / hallmark macro", "guidance": "Macro of the maker's signature and any numbering.", "requiredFor": "identity", "core": true, "unlocks": ["archive_lookup"] },
+    { "slotId": "full_piece", "label": "Full piece", "guidance": "Whole piece, square-on, even light, scale reference.", "requiredFor": "identity", "core": true },
+    { "slotId": "metal_purity_macro", "label": "Metal purity marks", "guidance": "Macro of purity / assay stamps (750, 18K, PT950).", "requiredFor": "material", "core": true },
+    { "slotId": "gemstone_detail", "label": "Principal gemstone", "guidance": "Close detail of the principal stone(s) — cut, setting, any inclusions visible.", "requiredFor": "material", "core": false, "unlocks": ["gem_attribution"] },
+    { "slotId": "clasp_fittings", "label": "Clasp / fittings", "guidance": "Clasp, findings and any signed fittings.", "requiredFor": "material", "core": false },
+    { "slotId": "certificate", "label": "Gem lab certificate / papers", "guidance": "GIA / SSEF / Gübelin report, receipt, or box and papers.", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "replaced_stones", "label": "Replaced stones", "description": "Original gems swapped for lesser or synthetic replacements." },
+    { "key": "added_altered_signature", "label": "Added / altered signature", "description": "A spurious or re-struck maker's signature on an unsigned or altered piece." },
+    { "key": "converted", "label": "Converted piece", "description": "Reworked from a larger or different original (a brooch from a tiara element)." },
+    { "key": "synthetic_as_natural", "label": "Synthetic presented as natural", "description": "Lab-grown or treated stones presented as natural and untreated." },
+    { "key": "plated_as_solid", "label": "Plated presented as solid", "description": "Gold- or rhodium-plated base metal presented as solid precious metal." }
+  ],
+  "corpusSources": [
+    { "name": "Maker archives (Cartier, Van Cleef & Arpels, Tiffany, Bulgari)", "tier": 1, "role": "ground_truth" },
+    { "name": "Gem lab certificates (GIA, SSEF, Gübelin)", "tier": 1, "role": "ground_truth" },
+    { "name": "Auction archives (Christie's, Sotheby's, Bonhams jewels)", "tier": 2, "role": "corroboration" },
+    { "name": "Collector forums and signed-jewellery boards", "tier": 4, "role": "cite_only" }
+  ],
+  "compKeys": ["maker", "metal", "gemstone", "carat", "period", "condition"],
+  "materialSlotClass": "metal_gem_setting"
+}

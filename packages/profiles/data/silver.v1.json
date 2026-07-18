@@ -1,0 +1,37 @@
+{
+  "category": "silver",
+  "version": 1,
+  "calibration": "provisional",
+  "label": "Silver & metalware (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "identityKeys": [
+    { "key": "maker", "label": "Maker / silversmith", "weight": 0.25 },
+    { "key": "hallmark", "label": "Assay / town hallmark", "weight": 0.3 },
+    { "key": "date_letter", "label": "Date letter", "weight": 0.15 },
+    { "key": "pattern", "label": "Pattern / form", "weight": 0.2 },
+    { "key": "standard_mark", "label": "Standard mark (sterling / 800 / 925)", "weight": 0.1 }
+  ],
+  "identityNeverKeys": ["serial"],
+  "captureSlots": [
+    { "slotId": "hallmark_macro", "label": "Hallmark macro", "guidance": "Macro of the full hallmark set (assay, standard, date letter, duty), raking light.", "requiredFor": "identity", "core": true, "unlocks": ["assay_dating"] },
+    { "slotId": "makers_mark_macro", "label": "Maker's mark macro", "guidance": "Macro of the maker's / silversmith's mark.", "requiredFor": "identity", "core": true },
+    { "slotId": "full_piece", "label": "Full piece", "guidance": "Whole piece, square-on, even light.", "requiredFor": "identity", "core": true },
+    { "slotId": "base_underside", "label": "Base / underside", "guidance": "Full base: solder seams, wear, any second-marked or weighted areas.", "requiredFor": "material", "core": true },
+    { "slotId": "pattern_detail", "label": "Pattern / chasing detail", "guidance": "Chasing, engraving or applied decoration under raking light — crispness, later work.", "requiredFor": "material", "core": false },
+    { "slotId": "weight_scale", "label": "Weight on scale", "guidance": "Piece on a scale showing gross weight (troy or grams).", "requiredFor": "custody", "core": false }
+  ],
+  "redFlags": [
+    { "key": "replated", "label": "Replated", "description": "Electroplated over worn or base metal and presented as solid silver." },
+    { "key": "erased_altered_hallmark", "label": "Erased / altered hallmark", "description": "Removed, re-struck, or let-in hallmarks — a hallmark not original to the piece." },
+    { "key": "married", "label": "Married piece", "description": "Body, lid, or base assembled from different pieces or periods." },
+    { "key": "later_decoration", "label": "Later decoration", "description": "Chasing or engraving added long after manufacture to raise value." },
+    { "key": "duty_dodger", "label": "Duty dodger", "description": "A genuine hallmark transposed from a small taxed item into a larger one." }
+  ],
+  "corpusSources": [
+    { "name": "Assay office records (London, Birmingham, Sheffield, Edinburgh)", "tier": 1, "role": "ground_truth" },
+    { "name": "Online Encyclopedia of Silver Marks (925-1000)", "tier": 2, "role": "corroboration", "url": "https://www.925-1000.com" },
+    { "name": "Auction archives (Christie's, Sotheby's, Bonhams silver)", "tier": 2, "role": "corroboration" },
+    { "name": "Collector forums and mark-identification boards", "tier": 4, "role": "cite_only" }
+  ],
+  "compKeys": ["maker", "pattern", "weight", "date_letter", "condition"],
+  "materialSlotClass": "hallmark_metal_form"
+}
