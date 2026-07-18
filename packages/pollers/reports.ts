@@ -42,7 +42,7 @@ export interface ReportPollerDeps {
 
 export interface ProcessedReport {
   reportId: string;
-  outcome: "delivered" | "produced_not_delivered" | "skipped" | "failed";
+  outcome: "delivered" | "produced_not_delivered" | "skipped" | "failed" | "refunded";
   tier?: string;
   reason?: string;
 }
@@ -176,6 +176,11 @@ export async function processAccountsReport(
         // (Curator-email recovery lives in sweepCuratorEmails — R-5. This
         // branch only fires while the accounts row is still in_production, so
         // it could never heal an email lost AFTER a successful delivery.)
+        if (redo.settled === "refunded") {
+          // A produced refund-state report (e.g. unscored) that never settled
+          // last tick now resolves the accounts row to `refunded`.
+          return { reportId: row.id, outcome: "refunded", tier: version.tier ?? undefined, reason: "settled: refunded" };
+        }
         return redo.delivered
           ? { reportId: row.id, outcome: "delivered", tier: version.tier ?? undefined, reason: "delivery retried" }
           : { reportId: row.id, outcome: "skipped", reason: `already produced; ${redo.reason}` };
@@ -285,6 +290,12 @@ export async function processAccountsReport(
 
   const delivery = await deliverReport(deps.accounts, result.report, result.version);
 
+  // A refund state (unscored / withheld) is settled to `refunded` on the
+  // accounts row — terminal, no deliverable, no curator email.
+  if (delivery.settled === "refunded") {
+    return { reportId: row.id, outcome: "refunded", tier: result.score.tier, reason: `settled: ${result.report.status}` };
+  }
+
   if (result.report.status === "provisional") {
     await sendCuratorReviewSafely(deps, order, result.report.id, result.score.tier); // EMAIL B
   }
@@ -299,6 +310,7 @@ export async function processAccountsReport(
 export interface PollSummary {
   polled: number;
   delivered: number;
+  refunded: number;
   skipped: number;
   failed: number;
   /** R-5: curator-review emails re-sent by the queue-independent sweep. */
@@ -331,6 +343,7 @@ export async function pollReports(deps: ReportPollerDeps): Promise<PollSummary> 
   return {
     polled: rows.length,
     delivered: results.filter((r) => r.outcome === "delivered").length,
+    refunded: results.filter((r) => r.outcome === "refunded").length,
     skipped: results.filter((r) => r.outcome === "skipped").length,
     failed: results.filter((r) => r.outcome === "failed").length,
     curatorEmailsResent,

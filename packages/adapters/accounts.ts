@@ -28,14 +28,18 @@ export interface AccountsReportRow {
   status: string;
 }
 
-/** Patch applied to a veradis-accounts `reports` row on delivery. */
-export interface AccountsReportPatch {
-  status: "delivered";
-  file_path: string;
-  pcs_score?: number;
-  valuation?: string;
-  delivered_at: string;
-}
+/** Patch applied to a veradis-accounts `reports` row. A delivery writes the
+ *  rendered report + score; a refund state (unscored / withheld) writes only a
+ *  terminal `refunded` status so the row never sits in_production forever. */
+export type AccountsReportPatch =
+  | {
+      status: "delivered";
+      file_path: string;
+      pcs_score?: number;
+      valuation?: string;
+      delivered_at: string;
+    }
+  | { status: "refunded" };
 
 /** The slice of a veradis-accounts `objects` row the engine reads. */
 export interface AccountsObjectRow {

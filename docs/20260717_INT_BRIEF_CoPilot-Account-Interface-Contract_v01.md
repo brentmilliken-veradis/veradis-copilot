@@ -8,7 +8,7 @@
 
 ---
 
-## Action needed (2)
+## Action needed (3)
 
 ### C-1 · Curator route auth — call it backend-to-backend with the shared secret
 CoPilot exposes the curator action (confirm / downgrade / withhold + expert valuation band) as an authenticated endpoint. It is the pivot that seals a report to *definitive*, writes back to the customer's account under the service role, and emails the customer — so it is fail-closed and must never be publicly callable.
@@ -60,6 +60,18 @@ On delivery, copilot writes the accounts `reports` row: `status='delivered'`, `f
 Net effect: a normal provisional shows its number; a capped one shows "under review." That split is the honest outcome. *(Optional, not required for launch: if you want a distinct visual for "uncalibrated category" vs. "awaiting curator confirmation," add a flag column and we'll populate it — but omission is sufficient.)*
 
 **`valuation`** is written only when a real expert-set band exists (never `0–0`) — render it only when present.
+
+---
+
+### C-3 · Refund states — CoPilot now settles `unscored`/`withheld` to `refunded`
+Previously a report that came back **`unscored`** (too little evidence to score) or **`withheld`** (curator refund) was never written back — the accounts row sat in `in_production` forever and the collector saw "processing…" with no resolution. CoPilot now writes **`status='refunded'`** to that row (no file, no score) so it reaches a terminal state. `refunded` is already in the `reports.status` domain — **no schema change needed.**
+
+**What to build:**
+- **Render `status='refunded'`** on the collections card and object page as an honest terminal state ("Couldn't be scored from the photos supplied — refunded" / "Withdrawn — refunded") — not a spinner, not "delivered".
+- **Issue the actual Stripe refund** against the row's `stripe_payment_intent` when it transitions to `refunded`. CoPilot only signals the terminal state; it never moves money. **Stripe stays TEST until the SARL is confirmed** — during TEST there is no real charge to reverse, so wire the real refund before live charging.
+- Optional: a customer email ("we couldn't score this / you've been refunded"). CoPilot does not send one today.
+
+This also resolves the live stuck-card case (the thin-photo Medal Set) automatically on the next cron tick after deploy.
 
 ---
 
