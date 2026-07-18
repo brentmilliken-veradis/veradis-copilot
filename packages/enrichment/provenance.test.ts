@@ -53,4 +53,32 @@ describe("deriveProvenanceCustody", () => {
     const n = "Inherited by descent; original receipt from 1990 retained.";
     expect(deriveProvenanceCustody(n)).toEqual(deriveProvenanceCustody(n));
   });
+
+  it("does NOT credit a DENIED claim — 'No original packaging'", () => {
+    const p = deriveProvenanceCustody("No original packaging. Case and coin in mint condition.");
+    expect(p.signals.map((s) => s.key)).not.toContain("original_packaging");
+  });
+
+  it("negation is clause-scoped — 'no scratches, original box' still credits the box", () => {
+    const p = deriveProvenanceCustody("No scratches, original box and papers retained.");
+    const keys = p.signals.map((s) => s.key);
+    expect(keys).toContain("original_packaging");
+    expect(keys).toContain("certificate"); // "papers"
+  });
+
+  it("credits family provenance — gift / heirloom / handed down", () => {
+    for (const n of ["A gift from my grandfather", "family heirloom", "handed down through three generations"]) {
+      expect(deriveProvenanceCustody(n).signals.map((s) => s.key)).toContain("documented_chain");
+    }
+  });
+
+  it("the Poppy description: credits the family gift, not the denied packaging", () => {
+    const notes =
+      "Christmas tradition and gift from Robert Milliken (b.1943) to his children and grandchildren. No original packaging. Case and coin in mint condition.";
+    const keys = deriveProvenanceCustody(notes).signals.map((s) => s.key);
+    expect(keys).toContain("documented_chain"); // "gift from" — family provenance
+    expect(keys).not.toContain("original_packaging"); // "No original packaging" — denied
+    // "(b.1943)" is a birth year, not a provenance date — correctly not credited.
+    expect(keys).not.toContain("dated_history");
+  });
 });
