@@ -8,8 +8,22 @@ import { runProvisional } from "./run";
 import { InMemoryRepository } from "@/packages/data/in-memory";
 import { StubStorage } from "@/packages/adapters/storage";
 import { resetStubRegistry } from "@/packages/adapters/stub-registry";
-import { buildWatchFixture } from "@/packages/fixtures/watch";
+import { readFileSync } from "node:fs";
+import { buildWatchFixture, type WatchPreset } from "@/packages/fixtures/watch";
 import { renderReport } from "@/packages/report/render";
+
+interface FieldGolden {
+  id: string;
+  name: string;
+  preset: WatchPreset;
+  notes: string;
+  expectedTier: string;
+  groundTruthSource: string;
+  validated: boolean;
+}
+const WATCH_GOLDEN = JSON.parse(
+  readFileSync(new URL("../../tests/golden/watches-calibration-v1.json", import.meta.url), "utf8"),
+) as { field_golden: FieldGolden[] };
 
 const matRaw = (s: { quadrants: { quadrant: string; raw: number }[] }) =>
   s.quadrants.find((q) => q.quadrant === "material")?.raw ?? NaN;
@@ -32,15 +46,24 @@ describe("watches end-to-end — calibration path", () => {
     expect(html.toLowerCase()).not.toContain("authenticated");
   });
 
-  it("the SAME genuine watch, PROVISIONAL (registry default), is capped to Flagged — the cap is load-bearing", async () => {
+  it("the SAME genuine watch, registry default (watches is now CALIBRATED), presents its real tier — not capped", async () => {
     const { order, adapters } = buildWatchFixture("genuine_strong");
-    // No profile override → the registry watches profile ships provisional.
+    // No profile override → the registry watches profile, now calibrated.
     const res = await runProvisional(new InMemoryRepository(), new StubStorage(), adapters, order);
 
-    expect(res.snapshot.capReason).toBe("uncalibrated_category");
-    expect(res.score.tier).toBe("flagged");
-    // The scorer's real tier is higher — proving the cap actually clamps.
-    expect(res.rawScore.tier).not.toBe("flagged");
+    expect(res.snapshot.capReason).toBeUndefined();
+    expect(["gold", "silver", "bronze"]).toContain(res.score.tier);
+  });
+
+  it("field-golden: every real-object entry reproduces its expert tier end-to-end", async () => {
+    for (const fg of WATCH_GOLDEN.field_golden) {
+      const { order, adapters, calibratedProfile } = buildWatchFixture(fg.preset, fg.id, fg.notes || undefined);
+      const res = await runProvisional(new InMemoryRepository(), new StubStorage(), adapters, order, {
+        profile: calibratedProfile,
+      });
+      expect(res.snapshot.capReason, `${fg.name} should not be capped`).toBeUndefined();
+      expect(res.score.tier, `${fg.name} expected ${fg.expectedTier}`).toBe(fg.expectedTier);
+    }
   });
 
   it("the theft add-on tightens a genuine watch's risk CI (the score-improver)", async () => {

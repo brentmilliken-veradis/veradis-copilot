@@ -18,9 +18,10 @@ import luxuryV1 from "./data/luxury.v1.json";
 /** Registry of built-in profiles. A category ships `provisional` (tier capped
  *  to Flagged) until its calibration is validated — a golden set + a validated
  *  real-object field-golden entry (see tests/golden/<cat>-calibration-v1.json).
- *  COINS is calibrated: PCGS/Numista Tier-1 + the 2007 RCM golden ladder. Medals
- *  is structurally full but not yet field-validated; watches, art, fine-china,
- *  silver and jewellery are SCAFFOLDS, thin-sourced. All non-calibrated
+ *  COINS and WATCHES are calibrated (coins: PCGS/Numista + the 2007 RCM ladder;
+ *  watches: §12 anchors + a Submariner/super-clone field-golden). Medals is
+ *  structurally full but not yet field-validated; art, fine-china, silver,
+ *  jewellery and luxury are SCAFFOLDS, thin-sourced. All non-calibrated
  *  categories run provisional/flagged and cannot seal definitive until their
  *  calibration lands. */
 const REGISTRY: CategoryProfile[] = [

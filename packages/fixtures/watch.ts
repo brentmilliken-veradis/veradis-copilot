@@ -48,9 +48,10 @@ function photos(): OrderIntake["photos"] {
 }
 
 /** Build a watch end-to-end fixture for the given preset. `objectId` seeds the
- *  scorer, so vary it per case for independent CI streams. */
-export function buildWatchFixture(preset: WatchPreset, objectId = `watch-${preset}`): WatchFixture {
-  const declared = preset === "franken" ? FRANKEN : GENUINE;
+ *  scorer, so vary it per case for independent CI streams. `notes` is the owner's
+ *  provenance description (scored into custody). */
+export function buildWatchFixture(preset: WatchPreset, objectId = `watch-${preset}`, notes?: string): WatchFixture {
+  const declared: Record<string, string> = { ...(preset === "franken" ? FRANKEN : GENUINE), ...(notes ? { notes } : {}) };
 
   // Brand-archive (Tier-1) closes every SUPPLIED identity key for the genuine
   // watch; the franken leaves serial/calibre unresolved.

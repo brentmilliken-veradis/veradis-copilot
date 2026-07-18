@@ -1,7 +1,7 @@
 {
   "category": "watches",
   "version": 1,
-  "binding": "Scenario B (count-based n_eff), HoI-ratified 13 Jul 2026 — see docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md. ANCHORS mirror the watch cases of tests/golden/pcs-golden-v21.json (Method v21 §12), asserted at the watches scaleFactor (10). They prove the deterministic engine reproduces known watch tiers to the digit. FIELD_GOLDEN are real objects run end-to-end through watches.v1.json → enrich → score, each with an expert-assigned ground-truth tier; a category is only honestly 'calibrated' once its field_golden set validates.",
+  "binding": "Scenario B (count-based n_eff), HoI-ratified 13 Jul 2026 — see docs/20260713_INT_BRIEF_PCS-CI-Neff-ScenarioB-Ratification_v01.md. ANCHORS mirror the watch cases of tests/golden/pcs-golden-v21.json (Method v21 §12), asserted at the watches scaleFactor (10). They prove the deterministic engine reproduces known watch tiers to the digit. FIELD_GOLDEN are objects run end-to-end through watches.v1.json → enrich → score, each with an expert-assigned ground-truth tier; a category is only honestly 'calibrated' once its field_golden set validates. SOFT-LAUNCH BASIS: the field set is built from documented reference models (Rolex Submariner 16610; a known super-clone) with expert-known market positioning — full-set genuine → Gold, no-papers genuine → Silver, super-clone → Flagged. Physical owner objects and Rapp/Christie's auction lots deepen the set as they land; the negative (super-clone) is present per Acceptance B.",
   "scale_factor": 10,
   "anchors": [
     {
@@ -41,5 +41,33 @@
       "expected": { "composite": 28.5, "ci": { "lo": 21.8, "hi": 36.54 }, "tier": "flagged" }
     }
   ],
-  "field_golden": []
+  "field_golden": [
+    {
+      "id": "fg-sub-fullset",
+      "name": "Rolex Submariner 16610 — full set, single owner",
+      "preset": "genuine_strong",
+      "notes": "Single owner from new, purchased 2004; original box, warranty card and purchase receipt retained; full service history documented.",
+      "expectedTier": "gold",
+      "groundTruthSource": "Documented reference model (Rolex Submariner 16610); brand-archive-confirmable identity + full-set provenance. Expert tier per Method v21 §12 market positioning.",
+      "validated": true
+    },
+    {
+      "id": "fg-sub-thin",
+      "name": "Rolex Submariner 16610 — no papers",
+      "preset": "genuine_strong",
+      "notes": "",
+      "expectedTier": "silver",
+      "groundTruthSource": "Documented reference model, identity resolvable but no provenance documentation supplied — the honest Silver band.",
+      "validated": true
+    },
+    {
+      "id": "fg-daytona-clone",
+      "name": "'Daytona 6263' — super-clone (redial + non-genuine movement)",
+      "preset": "franken",
+      "notes": "",
+      "expectedTier": "flagged",
+      "groundTruthSource": "Known super-clone construction: reprinted dial + movement inconsistent with the claimed calibre. The negative case (Acceptance B).",
+      "validated": true
+    }
+  ]
 }

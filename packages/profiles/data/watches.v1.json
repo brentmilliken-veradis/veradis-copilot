@@ -1,8 +1,8 @@
 {
   "category": "watches",
   "version": 1,
-  "calibration": "provisional",
-  "label": "Watches (SCAFFOLD — thin sources, uncalibrated; provisional/flagged only until Tier-1 + calibration land)",
+  "calibration": "calibrated",
+  "label": "Watches (calibrated — §12 anchors + Submariner/super-clone field-golden; brand-archive Tier-1)",
   "identityKeys": [
     { "key": "brand", "label": "Brand / maker", "weight": 0.2 },
     { "key": "reference", "label": "Model / reference number", "weight": 0.25 },
