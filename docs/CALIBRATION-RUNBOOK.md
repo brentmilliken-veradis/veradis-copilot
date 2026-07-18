@@ -50,12 +50,17 @@ category (watches needed the first two built; both are done):
   scaleFactor. These prove the *scorer* on known objects. They span the tier
   range — a set that only proves Gold proves nothing; include a known fake that
   must land Flagged.
-- **Field-golden.** Real objects run end-to-end through the profile: at least two
-  genuine anchors with provenance and one known-negative (super-clone / franken /
-  redial), each with an expert-assigned tier and a named ground-truth source
-  (owner-with-papers, dealer authentication, brand archive extract). This is what
-  the flip actually waits on. Build a fixture per object with
-  `buildWatchFixture`-style helpers so it runs through `runProvisional`.
+- **Field-golden.** Real objects run end-to-end through the profile, each with an
+  expert-assigned tier and a named ground-truth source (owner-with-papers, dealer
+  authentication, brand archive extract). This is what the flip actually waits on.
+  **Soft-launch stance:** the honesty ceiling disclaims authentication and the
+  tier maps on the lower bound, so a category calibrates on genuine real objects;
+  a known-negative (super-clone / franken / redial / tooled or cast counterfeit)
+  is **recommended and added when one is sourced — not a launch blocker**. The
+  scorer's ability to flag a fake is proven category-independently by the §12
+  golden (fake Daytona → Flagged) and the material red-flag mapping. Build a
+  fixture per object with `buildWatchFixture`-style helpers, or validate through
+  the acceptance path, so it runs through `runProvisional`.
 
 ## The flip — one atomic change, only after the golden set is green
 
