@@ -17,8 +17,15 @@ import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
 import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
+import { loadProfile } from "@/packages/profiles/loader";
+import type { CategoryProfile } from "@/packages/pcs-types";
 
 const SECRET = "tally-test-secret";
+
+// The EMAIL-C ladder needs a confirmable (definitive-eligible) report; coins
+// ships `provisional`, so this mechanism test runs against a calibrated profile
+// override. No shipped category is calibrated (loader.test.ts guard).
+const calibratedCoins: CategoryProfile = { ...loadProfile("coins"), calibration: "calibrated" };
 
 function sign(body: string): string {
   return createHmac("sha256", SECRET).update(body, "utf8").digest("base64");
@@ -150,7 +157,7 @@ describe("intake → provisional → definitive email ladder", () => {
       declaredAttributes: parsed.declaredAttributes,
       ownerFacingName: parsed.ownerName ?? undefined,
       photos,
-    });
+    }, { profile: calibratedCoins });
     expect(result.report.status).toBe("provisional");
     await sendCuratorReview(repo, emailer, order, result.report.id, result.score.tier);
     expect(emailer.sent[1].subject).toMatch(/Review needed/);

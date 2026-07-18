@@ -75,6 +75,18 @@ describe("profile loader", () => {
     expect(() => loadProfile("furniture")).toThrow(ProfileValidationError);
   });
 
+  it("every shipped profile ships provisional until its calibration is validated", () => {
+    // Honesty invariant (D-1): no shipped category may present a confident tier
+    // until its P2 calibration — a golden set + tuned CI — is validated.
+    // Calibrating a category is a deliberate act: flip its flag to "calibrated"
+    // AND add its golden regression test in the SAME change, then update this
+    // guard. A silent re-flip must fail CI here.
+    const calibrated = allProfiles()
+      .filter((p) => p.calibration === "calibrated")
+      .map((p) => `${p.category}@${p.version}`);
+    expect(calibrated).toEqual([]);
+  });
+
   it("seeds all built-in profiles into a repository", async () => {
     const repo = new InMemoryRepository();
     await seedProfiles(repo);

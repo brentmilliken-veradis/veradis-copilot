@@ -12,11 +12,12 @@ import watchesV1 from "./data/watches.v1.json";
 import artV1 from "./data/art.v1.json";
 import fineChinaV1 from "./data/fine-china.v1.json";
 
-/** Registry of built-in profiles. Coins is the Phase A engine-prover (full,
- *  calibrated). Medals v2 (full), watches, art and fine-china are ADR-002
- *  SCAFFOLDS: structurally complete but thin-sourced and uncalibrated — no
- *  Tier-1 adapter serves them yet, so their results run provisional/flagged
- *  and must never reach a paying customer before P2 calibration. */
+/** Registry of built-in profiles. Every category ships `provisional` until its
+ *  P2 calibration is validated (golden set + tuned CI). Coins and medals are
+ *  structurally full with Tier-1 sources defined, but not yet calibration-
+ *  validated; watches, art and fine-china are ADR-002 SCAFFOLDS, thin-sourced
+ *  and uncalibrated. All run provisional/flagged, and none can present a
+ *  confident tier or seal definitive before its P2 calibration lands. */
 const REGISTRY: CategoryProfile[] = [
   coinsV1 as CategoryProfile,
   medalsV1 as CategoryProfile,

@@ -144,9 +144,13 @@ export async function runProvisional(
   storage: Storage,
   adapters: PipelineAdapters,
   order: OrderIntake,
+  /** Optional overrides. `profile` pins/overrides the category profile the
+   *  order is scored against (version pin / test seam); defaults to the
+   *  registry profile. Production ships every category `provisional`. */
+  opts: { profile?: CategoryProfile } = {},
 ): Promise<PipelineResult> {
   // E2 — intake (report becomes paid)
-  const intake = await intakeOrder(repo, storage, order);
+  const intake = await intakeOrder(repo, storage, order, opts.profile);
 
   // E3 — ingestion + mislabel correction + C2PA gate
   const ing = await ingest(repo, adapters.vision, {

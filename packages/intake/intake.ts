@@ -5,7 +5,7 @@
 import type { EvidenceItem, Report, CategoryProfile } from "@/packages/pcs-types";
 import type { Repository } from "@/packages/data/repository";
 import type { Storage } from "@/packages/adapters/storage";
-import { loadProfile } from "@/packages/profiles/loader";
+import { loadProfile, validateProfile } from "@/packages/profiles/loader";
 import { assertTransition } from "@/packages/orchestrator/state";
 import type { OrderIntake } from "./types";
 
@@ -33,8 +33,11 @@ export async function intakeOrder(
   repo: Repository,
   storage: Storage,
   order: OrderIntake,
+  /** Optional profile override (version pin / test seam). Validated like any
+   *  registry profile; defaults to the registry profile for the order category. */
+  profileOverride?: CategoryProfile,
 ): Promise<IntakeResult> {
-  const profile = loadProfile(order.category); // throws on an unsupported category
+  const profile = profileOverride ? validateProfile(profileOverride) : loadProfile(order.category); // throws on an unsupported category
   const objectId = order.objectId ?? `obj:${order.orderId}`;
 
   const report = await repo.createReport({

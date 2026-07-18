@@ -15,6 +15,8 @@ import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
 import { resetStubRegistry } from "@/packages/adapters/stub-registry";
 import { renderReport } from "@/packages/report/render";
 import type { OrderIntake } from "@/packages/intake/types";
+import { loadProfile } from "@/packages/profiles/loader";
+import type { CategoryProfile } from "@/packages/pcs-types";
 
 const enc = new TextEncoder();
 
@@ -28,6 +30,11 @@ function adapters(): PipelineAdapters {
     narrative: new StubNarrativeAdapter(),
   };
 }
+
+// Coins ships `provisional`; these tests exercise the calibrated-category
+// confirm/band mechanism against a calibrated profile override. No shipped
+// category is calibrated — the loader.test.ts guard enforces that.
+const calibratedCoins = (): CategoryProfile => ({ ...loadProfile("coins"), calibration: "calibrated" });
 
 function appraiseOrder(): OrderIntake {
   return {
@@ -62,7 +69,7 @@ describe("F-8 — Appraise valuation honesty", () => {
 
   it("the expert-set band at confirm is the only number that renders", async () => {
     const repo = new InMemoryRepository();
-    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder());
+    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder(), { profile: calibratedCoins() });
 
     const confirmed = await confirmReport(repo, {
       reportId: res.report.id,
@@ -82,7 +89,7 @@ describe("F-8 — Appraise valuation honesty", () => {
 
   it("guards: a 0–0 or inverted band is rejected; a band on a non-Appraise is rejected", async () => {
     const repo = new InMemoryRepository();
-    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder());
+    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder(), { profile: calibratedCoins() });
     const base = { reportId: res.report.id, curator: "C", credentialClass: "curator" as const, verb: "confirmed" as const };
 
     await expect(confirmReport(repo, { ...base, valuationBand: { currency: "CAD", lo: 0, hi: 0 } })).rejects.toThrow(/0–0/);
@@ -93,7 +100,7 @@ describe("F-8 — Appraise valuation honesty", () => {
       orderId: "ord-verify",
       objectId: "coin-verify",
       sku: "verify",
-    });
+    }, { profile: calibratedCoins() });
     await expect(
       confirmReport(repo, { ...base, reportId: verify.report.id, valuationBand: { currency: "CAD", lo: 100, hi: 200 } }),
     ).rejects.toThrow(/no Appraise valuation/);
@@ -101,7 +108,7 @@ describe("F-8 — Appraise valuation honesty", () => {
 
   it("R-6: an invalid band writes NO curator_action; a valid confirm mints exactly one", async () => {
     const repo = new InMemoryRepository();
-    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder());
+    const res = await runProvisional(repo, new StubStorage(), adapters(), appraiseOrder(), { profile: calibratedCoins() });
     const base = { reportId: res.report.id, curator: "C", credentialClass: "curator" as const, verb: "confirmed" as const };
 
     // Two invalid attempts throw — and leave the audit trail empty.
