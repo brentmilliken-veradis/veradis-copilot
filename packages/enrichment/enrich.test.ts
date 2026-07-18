@@ -99,13 +99,32 @@ describe("enrich (E4)", () => {
     expect(checks.find((c) => c.quadrant === "risk" && c.key === "stolen")?.result).toBe("flagged");
   });
 
-  it("clean registries produce a resolved Risk check and empty risk events", async () => {
+  it("a clean sanctions screen resolves; the stolen-property register is an honest gap without the add-on", async () => {
     const repo = new InMemoryRepository();
     const report = await makeReport(repo);
     const res = await enrich(repo, adapters(), input(report, RESOLVED));
     expect(res.scoreInputs.risk).toHaveLength(0);
+    expect(res.scoreInputs.theftRegistryChecked).toBe(false);
     const checks = await repo.listChecks(report.id);
-    expect(checks.find((c) => c.quadrant === "risk" && c.key === "registries")?.result).toBe("match");
+    // The sanctions/PEP screen ran clean…
+    const sanctions = checks.find((c) => c.quadrant === "risk" && c.key === "sanctions_screen");
+    expect(sanctions?.result).toBe("match");
+    expect(sanctions?.authorityState).toBe("resolved");
+    // …but the stolen-property register was never queried — a gap, not a clean.
+    const theft = checks.find((c) => c.quadrant === "risk" && c.key === "stolen_registry");
+    expect(theft?.result).toBe("gap_held_open");
+    expect(theft?.authorityState).toBe("missing");
+  });
+
+  it("the theft add-on resolves the stolen-property register and closes a second risk trial", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    const res = await enrich(repo, adapters(), { ...input(report, RESOLVED), theftRegistryChecked: true });
+    expect(res.scoreInputs.theftRegistryChecked).toBe(true);
+    const checks = await repo.listChecks(report.id);
+    const theft = checks.find((c) => c.quadrant === "risk" && c.key === "stolen_registry");
+    expect(theft?.result).toBe("match");
+    expect(theft?.authorityState).toBe("resolved");
   });
 
   it("internal graph cross-ref raises custody coverage and cites the institution", async () => {

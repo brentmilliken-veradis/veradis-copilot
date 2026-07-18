@@ -58,4 +58,14 @@ describe("quadrant scorers (Method v21 §2–§5)", () => {
   it("risk: a medium lien subtracts 15 (no cap needed)", () => {
     expect(scoreRisk([{ kind: "lien", severity: "medium" }], false).raw).toBe(85);
   });
+
+  it("risk: the theft add-on adds a second trial (tighter CI) without lifting the raw", () => {
+    const base = scoreRisk([], false);
+    const withAddon = scoreRisk([], false, true);
+    // Same raw (the 90 cap stands)…
+    expect(withAddon.raw).toBe(base.raw);
+    // …but a second resolved trial → higher n_eff → tighter CI downstream.
+    expect(base.totalWeight).toBe(1);
+    expect(withAddon.totalWeight).toBe(2);
+  });
 });
