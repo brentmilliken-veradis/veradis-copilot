@@ -67,8 +67,16 @@ export interface EnrichResult {
   scoreInputs: ScoreInputs;
 }
 
-/** Which coin/medal red flags are material-integrity problems. */
-const MATERIAL_FLAGS = new Set(["cast_tooled", "altered_date", "cleaned_whizzed", "fake_slab", "renamed", "copy_striking"]);
+/** Which red flags are material-integrity problems, by category family. Coins/
+ *  medals: casting, tooling, cleaning, slab/rim tampering. Watches (P2): a
+ *  redial, a frankenwatch, a non-genuine movement or an over-polished case are
+ *  all integrity failures the material quadrant must register — without them the
+ *  engine cannot catch a super-clone through the pipeline. `altered_serial` is
+ *  an identity/risk tell, handled outside the material set. */
+const MATERIAL_FLAGS = new Set([
+  "cast_tooled", "altered_date", "cleaned_whizzed", "fake_slab", "renamed", "copy_striking",
+  "redial", "franken", "fake_movement", "overpolished_case",
+]);
 
 export async function enrich(
   repo: Repository,
