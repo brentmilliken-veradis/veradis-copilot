@@ -12,6 +12,7 @@ import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
 import { StubNarrativeAdapter } from "@/packages/adapters/narrative";
+import type { ValuationAdapter, ValuationEstimate } from "@/packages/adapters/valuation";
 import { resetStubRegistry } from "@/packages/adapters/stub-registry";
 import { renderReport } from "@/packages/report/render";
 import type { OrderIntake } from "@/packages/intake/types";
@@ -120,5 +121,85 @@ describe("F-8 — Appraise valuation honesty", () => {
     // A valid confirm mints exactly one immutable action.
     await confirmReport(repo, { ...base, valuationBand: { currency: "CAD", lo: 1200, hi: 1800 } });
     expect(await repo.listCuratorActions(res.report.id)).toHaveLength(1);
+  });
+});
+
+// F-8 indicative mode: when a valuation adapter is wired it may attach a clearly-
+// LABELLED machine estimate to a provisional Appraise. It is never a certified
+// band, degrades to the no-band default when unusable, and never moves the score.
+const fakeValuation = (est: ValuationEstimate | null): ValuationAdapter => ({
+  name: "valuation:fake",
+  async estimate() {
+    return est;
+  },
+});
+
+const EST: ValuationEstimate = {
+  currency: "CAD",
+  fmvLo: 50,
+  fmvHi: 130,
+  marketInterest: "modest",
+  basis: "2004 RCM proof dollar, mintage 25,000, in full original packaging.",
+  factors: [
+    { name: "Limited mintage (25,000)", kind: "lift", effect: "scarcity supports the upper range" },
+    { name: "Indicative estimate", kind: "info", effect: "not based on live comparable sales" },
+  ],
+  confidence: "moderate",
+};
+
+describe("F-8 indicative mode — a labelled machine estimate, score untouched", () => {
+  beforeEach(() => resetStubRegistry());
+
+  it("attaches a clearly-labelled indicative band when the adapter returns an estimate", async () => {
+    const res = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters(), valuation: fakeValuation(EST) },
+      appraiseOrder(),
+      { profile: calibratedCoins() },
+    );
+    const v = res.snapshot.valuation!;
+    expect(v).toMatchObject({ fmvLo: 50, fmvHi: 130, indicative: true, estimateConfidence: "moderate" });
+    expect(v.basis).toContain("mintage");
+    expect(v.factors.some((f) => f.kind === "info")).toBe(true);
+
+    const html = renderReport(res.snapshot);
+    expect(html).toContain("CAD 50–130");
+    expect(html).toContain("Machine estimate — not a certified appraisal");
+    expect(html).toContain("Market interest: modest");
+    expect(html).not.toContain("Indicative value — under expert review"); // the valuation-pending line is gone (the provisional watermark is a separate line)
+    expect(html.toLowerCase()).not.toContain("certified appraisal</h"); // ceiling: never a certified-appraisal header
+  });
+
+  it("a null estimate degrades to the F-8 default — no band, 'under expert review'", async () => {
+    const res = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters(), valuation: fakeValuation(null) },
+      appraiseOrder(),
+      { profile: calibratedCoins() },
+    );
+    expect(res.snapshot.valuation!.fmvLo).toBeUndefined();
+    expect(renderReport(res.snapshot)).toContain("Indicative value — under expert review");
+  });
+
+  it("the indicative valuation NEVER moves the score (F-8 independence)", async () => {
+    const withVal = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      { ...adapters(), valuation: fakeValuation(EST) },
+      appraiseOrder(),
+      { profile: calibratedCoins() },
+    );
+    const without = await runProvisional(
+      new InMemoryRepository(),
+      new StubStorage(),
+      adapters(),
+      appraiseOrder(),
+      { profile: calibratedCoins() },
+    );
+    // Composite is a deterministic weighted sum of the quadrant raws (no seed) —
+    // identical inputs ⇒ identical composite whether or not a value was attached.
+    expect(withVal.score.composite).toBe(without.score.composite);
   });
 });

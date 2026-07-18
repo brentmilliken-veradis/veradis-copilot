@@ -17,6 +17,7 @@ import { StubEmbeddingAdapter } from "@/packages/adapters/embedding";
 import { StubGraphAdapter } from "@/packages/adapters/graph";
 import { StubSanctionsAdapter } from "@/packages/adapters/sanctions";
 import { getNarrativeAdapter } from "@/packages/adapters/narrative";
+import { getValuationAdapter } from "@/packages/adapters/valuation";
 import type { PipelineAdapters } from "@/packages/pipeline/run";
 
 export interface AppStore {
@@ -37,6 +38,9 @@ function buildAdapters(storage: Storage): PipelineAdapters {
     graph: new StubGraphAdapter(),
     sanctions: new StubSanctionsAdapter(),
     narrative: getNarrativeAdapter(),
+    // Indicative valuation (F-8 mode) — Claude when VALUATION_API_KEY/ANTHROPIC_API_KEY
+    // is set, else the stub (no engine band; "under expert review").
+    valuation: getValuationAdapter(),
   };
 }
 

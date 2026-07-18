@@ -104,14 +104,27 @@ function valuation(s: ReportSnapshot): string {
   const actions = v.actions
     .map((a) => `<li>${esc(a.action)} <span class="eff">${esc(a.expectedBandEffect)}</span></li>`)
     .join("");
-  // F-8: only an expert-set band is ever shown as a number. No band — or a
-  // degenerate 0–0 — renders the under-review line instead. Never fabricate.
+  const factors = v.factors
+    .map((f) => `<li class="factor factor-${esc(f.kind)}">${esc(f.name)}${f.effect ? ` — <span class="eff">${esc(f.effect)}</span>` : ""}</li>`)
+    .join("");
+  // F-8: a number is shown only as (a) an expert-set band, or (b) a clearly-
+  // labelled INDICATIVE machine estimate. No band — or a degenerate 0–0 —
+  // renders the under-review line. A certified figure is never fabricated.
   const hasBand = v.fmvLo !== undefined && v.fmvHi !== undefined && !(v.fmvLo === 0 && v.fmvHi === 0);
-  const band = hasBand
-    ? `<p class="fmv">${esc(v.currency)} ${v.fmvLo!.toLocaleString()}–${v.fmvHi!.toLocaleString()}</p>`
-    : `<p class="fmv-pending">Indicative value — under expert review</p>`;
+  let head: string;
+  if (hasBand && v.indicative) {
+    head = `<p class="fmv">${esc(v.currency)} ${v.fmvLo!.toLocaleString()}–${v.fmvHi!.toLocaleString()}</p>
+    <p class="fmv-note">Machine estimate — not a certified appraisal. Market interest: ${esc(v.marketInterest)}. An expert confirms the firm band.</p>
+    ${v.basis ? `<p class="fmv-basis">${esc(v.basis)}</p>` : ""}`;
+  } else if (hasBand) {
+    head = `<p class="fmv">${esc(v.currency)} ${v.fmvLo!.toLocaleString()}–${v.fmvHi!.toLocaleString()}</p>`;
+  } else {
+    head = `<p class="fmv-pending">Indicative value — under expert review</p>`;
+  }
+  const factorsBlock = factors ? `<h3>Value factors</h3><ul class="factors">${factors}</ul>` : "";
   return `<section class="appraise"><h2>Indicative fair market value</h2>
-    ${band}
+    ${head}
+    ${factorsBlock}
     <h3>Comparable sales</h3>
     <table><thead><tr><th>Source</th><th>Venue</th><th>Date</th><th>Result</th><th>Basis</th></tr></thead><tbody>${comps}</tbody></table>
     <h3>Actions</h3><ol class="actions">${actions}</ol></section>`;
@@ -176,6 +189,11 @@ tr:last-child td{border-bottom:none}
 .arith{color:var(--muted);font-size:12.5px;font-family:ui-monospace,monospace}
 .fmv{font-family:'Instrument Sans',sans-serif;font-size:26px;font-weight:700;color:var(--forest);margin:6px 0 14px}
 .fmv-pending{font-style:italic;color:var(--muted);margin:6px 0 14px}
+.fmv-note{color:var(--muted);font-size:13px;margin:-6px 0 6px}
+.fmv-basis{font-size:13px;margin:0 0 14px}
+.factors{margin:6px 0 14px;padding-left:18px}
+.factors .factor{margin:3px 0}
+.factors .eff{color:var(--muted)}
 .actions{padding-left:18px}.actions li{margin:6px 0}.eff{color:var(--muted);font-size:12.5px}
 .caveat,.independence,.staleness{color:var(--muted);font-size:13px}
 .verify{background:rgba(15,31,56,.03);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}

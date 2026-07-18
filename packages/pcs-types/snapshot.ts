@@ -80,9 +80,13 @@ export interface RankedAction {
 
 export interface Valuation {
   currency: string;
-  /** Indicative FMV band — EXPERT-SET at curator confirm (F-8, D-3). The
-   *  engine never synthesises a band: a provisional Appraise omits both and
-   *  renders "Indicative value — under expert review". */
+  /** FMV band. Two honest sources, never conflated:
+   *   1. EXPERT-SET at curator confirm (F-8, D-3) — the authoritative band.
+   *   2. An engine-drafted INDICATIVE estimate (`indicative: true`), shown only
+   *      when the valuation adapter is active, clearly labelled a machine
+   *      estimate, and NEVER fed to the score.
+   *  With neither, a provisional Appraise omits both and renders
+   *  "Indicative value — under expert review". */
   fmvLo?: number;
   fmvHi?: number;
   sellLo?: number;
@@ -92,6 +96,15 @@ export interface Valuation {
   factors: Factor[];
   actions: RankedAction[];
   marketInterest: "low" | "modest" | "warm" | "high";
+  /** True when fmvLo/fmvHi are an ENGINE indicative estimate, not an expert-set
+   *  band — drives the "machine estimate, not a certified appraisal" labelling.
+   *  An expert confirm sets a firm band and clears this flag. */
+  indicative?: boolean;
+  /** One-line cited basis for an indicative estimate (what it is grounded in). */
+  basis?: string;
+  /** Indicative confidence — never more than "moderate"; an engine estimate is
+   *  explicitly not a certified valuation. */
+  estimateConfidence?: "low" | "moderate";
 }
 
 export interface NarrativeSection {

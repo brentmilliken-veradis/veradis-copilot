@@ -25,6 +25,8 @@ import type { EmbeddingAdapter } from "@/packages/adapters/embedding";
 import type { GraphAdapter } from "@/packages/adapters/graph";
 import type { SanctionsAdapter } from "@/packages/adapters/sanctions";
 import type { NarrativeAdapter } from "@/packages/adapters/narrative";
+import type { ValuationAdapter } from "@/packages/adapters/valuation";
+import { deriveProvenanceCustody } from "@/packages/enrichment/provenance";
 import { listStubbed, type StubFlag } from "@/packages/adapters/stub-registry";
 import { capTier } from "./cap";
 import { intakeOrder } from "@/packages/intake/intake";
@@ -42,6 +44,11 @@ export interface PipelineAdapters {
   graph: GraphAdapter;
   sanctions: SanctionsAdapter;
   narrative: NarrativeAdapter;
+  /** Optional (F-8 indicative mode). When present and it returns an estimate, a
+   *  provisional Appraise carries a clearly-labelled INDICATIVE band; absent or
+   *  null-returning, the F-8 default holds (no engine band, "under expert
+   *  review"). Never a score input. */
+  valuation?: ValuationAdapter;
 }
 
 export interface PipelineResult {
@@ -200,19 +207,53 @@ export async function runProvisional(
     corrections: ing.corrections.map((c) => ({ claimed: c.claimed, correctedValue: c.correctedValue })),
   });
 
-  // F-8 (D-3): the engine NEVER synthesises a valuation band. A provisional
-  // Appraise carries no number — the indicative band is expert-set at curator
-  // confirm and rendered under the honesty ceiling.
-  const valuation: Valuation | undefined =
-    order.sku === "appraise"
-      ? {
-          currency: order.currency ?? "CAD",
-          comps: [],
-          factors: [],
-          actions: [{ rank: 1, action: "Supply comparable-sale evidence to tighten the valuation", expectedBandEffect: "Narrows the FMV band" }],
-          marketInterest: "modest",
-        }
-      : undefined;
+  // F-8 (D-3): the engine never synthesises a CERTIFIED band. A provisional
+  // Appraise defaults to no number — the authoritative band is expert-set at
+  // curator confirm. When a valuation adapter is wired (indicative mode), it may
+  // ALSO attach a clearly-labelled INDICATIVE estimate; this never touches the
+  // score (assembled after scoring; never fed to scorePcs) and an unusable
+  // estimate falls back to the no-band default.
+  let valuation: Valuation | undefined;
+  if (order.sku === "appraise") {
+    const currency = order.currency ?? "CAD";
+    valuation = {
+      currency,
+      comps: [],
+      factors: [],
+      actions: [{ rank: 1, action: "Supply comparable-sale evidence to tighten the valuation", expectedBandEffect: "Narrows the FMV band" }],
+      marketInterest: "modest",
+    };
+    if (adapters.valuation) {
+      const notes = ing.resolvedAttributes.notes ?? ing.declaredAttributes.notes;
+      const valueSignals = deriveProvenanceCustody(notes).signals.map((s) => s.label);
+      let est = null;
+      try {
+        est = await adapters.valuation.estimate({
+          objectId: ing.report.objectId,
+          category: ing.report.category,
+          currency,
+          resolvedAttributes: ing.resolvedAttributes,
+          valueSignals,
+          notes: notes ?? undefined,
+        });
+      } catch (e) {
+        console.warn(`valuation estimate failed for ${ing.report.id} — ${(e as Error).message}`);
+      }
+      if (est) {
+        valuation = {
+          ...valuation,
+          currency: est.currency,
+          fmvLo: est.fmvLo,
+          fmvHi: est.fmvHi,
+          marketInterest: est.marketInterest,
+          factors: est.factors,
+          indicative: true,
+          basis: est.basis,
+          estimateConfidence: est.confidence,
+        };
+      }
+    }
+  }
 
   const snapshot0 = await assembleSnapshot(
     repo,
