@@ -85,8 +85,11 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
 
   // Confirmed / downgraded → mint the definitive version.
   let tier = prevSnap.score.tier;
+  let tierAdjusted = false;
   if (input.verb === "downgraded" && input.downgradeTo) {
-    tier = applyCritic(tier, input.downgradeTo); // never inflates
+    const stepped = applyCritic(tier, input.downgradeTo); // never inflates
+    tierAdjusted = stepped !== tier; // A1: a real step-down, not a no-op
+    tier = stepped;
   }
 
   const nextV = provisional.v + 1;
@@ -97,6 +100,10 @@ export async function confirmReport(repo: Repository, input: ConfirmInput): Prom
       provisional: false,
       score: { ...prevSnap.score, tier },
       valuation,
+      // A1: mark the sealed snapshot so the delivery bridge withholds the bare
+      // composite-derived score (it maps to the un-downgraded tier). Kept off
+      // the snapshot entirely unless a step-down happened (hash-stable).
+      ...(tierAdjusted ? { tierAdjusted: true as const } : {}),
       snapshotSha256: undefined,
       supersedesSha256: undefined,
     },

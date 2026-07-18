@@ -6,7 +6,7 @@ import { deliverReport } from "./bridge";
 import { VeradisAccountsClient } from "@/packages/adapters/accounts";
 import { buildCoin2007 } from "@/packages/fixtures/coin-2007";
 import { listStubbed, resetStubRegistry } from "@/packages/adapters/stub-registry";
-import type { Report, ReportVersion } from "@/packages/pcs-types";
+import type { Report, ReportVersion, Valuation } from "@/packages/pcs-types";
 
 const ACCOUNTS_URL = "https://accounts-ref.supabase.co";
 const NOW = "2026-07-17T12:00:00.000Z";
@@ -107,6 +107,63 @@ describe("deliverReport", () => {
     // Uncapped → pcs_score as today.
     await deliverReport(client, copilotReport(), version(), () => NOW);
     expect(typeof patches[1].patch.pcs_score).toBe("number");
+  });
+
+  it("A1: a curator-downgraded report's patch carries NO bare pcs_score (tierAdjusted)", async () => {
+    const patches: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("/rest/v1/reports?") && init?.method === "PATCH") {
+          patches.push(JSON.parse(init.body as string));
+        }
+        if (url.includes("/rest/v1/reports?") && (!init || !init.method)) {
+          return new Response(JSON.stringify([accountsRow]), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const client = new VeradisAccountsClient(ACCOUNTS_URL, "key");
+
+    // A sealed definitive whose tier was stepped down — composite unchanged.
+    const downgraded = version();
+    downgraded.snapshotJson = { ...downgraded.snapshotJson, tierAdjusted: true };
+    const out = await deliverReport(client, copilotReport("definitive"), downgraded, () => NOW);
+
+    expect(out.delivered).toBe(true);
+    expect(patches[0].status).toBe("delivered"); // the HTML still delivers
+    expect(patches[0].pcs_score).toBeUndefined(); // the un-downgraded number never crosses
+  });
+
+  it("A2: a capped report never leaks a valuation band across the bridge either", async () => {
+    const patches: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("/rest/v1/reports?") && init?.method === "PATCH") {
+          patches.push(JSON.parse(init.body as string));
+        }
+        if (url.includes("/rest/v1/reports?") && (!init || !init.method)) {
+          return new Response(JSON.stringify([accountsRow]), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const client = new VeradisAccountsClient(ACCOUNTS_URL, "key");
+
+    // Defense-in-depth: even if a real band somehow rode along on a capped
+    // snapshot, the cap suppresses BOTH the score and the valuation.
+    const cappedWithBand = version();
+    cappedWithBand.snapshotJson = {
+      ...cappedWithBand.snapshotJson,
+      capReason: "uncalibrated_category",
+      valuation: { currency: "CAD", fmvLo: 100, fmvHi: 200, comps: [], factors: [], actions: [], marketInterest: "modest" } as Valuation,
+    };
+    const out = await deliverReport(client, copilotReport(), cappedWithBand, () => NOW);
+
+    expect(out.delivered).toBe(true);
+    expect(patches[0].pcs_score).toBeUndefined();
+    expect(patches[0].valuation).toBeUndefined();
   });
 
   it("does nothing without an accounts client (stub-flagged)", async () => {
