@@ -160,6 +160,8 @@ describe("parse helpers", () => {
   it("parseValuationBand reads the bridge format and rejects empty bands", () => {
     expect(parseValuationBand("CAD 100–200")).toEqual({ currency: "CAD", lo: 100, hi: 200 });
     expect(parseValuationBand("CHF 50-80")).toEqual({ currency: "CHF", lo: 50, hi: 80 });
+    // thousands separators (toLocaleString on a ≥1000 band) must not drop the object
+    expect(parseValuationBand("CAD 1,200–1,800")).toEqual({ currency: "CAD", lo: 1200, hi: 1800 });
     expect(parseValuationBand("CAD 0–0")).toBeNull();
     expect(parseValuationBand("appraised")).toBeNull();
     expect(parseValuationBand(null)).toBeNull();

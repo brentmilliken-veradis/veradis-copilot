@@ -69,10 +69,12 @@ export function parseTimelineDate(year: string | null): string | null {
 
 /** Parse the delivery bridge's valuation band format: "CAD 100–200". */
 export function parseValuationBand(v: string | null): { currency: string; lo: number; hi: number } | null {
-  const m = v?.match(/^(\S+)\s+([\d.]+)\s*[–-]\s*([\d.]+)$/);
+  // Bands are rendered with toLocaleString, so a ≥1000 figure carries a thousands
+  // separator ("CAD 1,200–1,800"); accept commas and strip them before Number().
+  const m = v?.match(/^(\S+)\s+([\d.,]+)\s*[–-]\s*([\d.,]+)$/);
   if (!m) return null;
-  const lo = Number(m[2]);
-  const hi = Number(m[3]);
+  const lo = Number(m[2].replace(/,/g, ""));
+  const hi = Number(m[3].replace(/,/g, ""));
   if (!Number.isFinite(lo) || !Number.isFinite(hi) || (lo === 0 && hi === 0)) return null;
   return { currency: m[1], lo, hi };
 }

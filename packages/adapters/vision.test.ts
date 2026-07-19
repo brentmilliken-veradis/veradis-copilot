@@ -98,6 +98,12 @@ describe("parseVisionJson", () => {
     expect(out?.redFlags).toEqual([{ key: "renamed", evidenceSlot: "suspension_naming", note: "re-cut naming" }]);
   });
 
+  it("reads the vision-chosen heroSlot when named", () => {
+    expect(parseVisionJson('{"derivedAttributes":{},"redFlags":[],"heroSlot":"reverse"}')?.heroSlot).toBe("reverse");
+    expect(parseVisionJson('{"derivedAttributes":{},"redFlags":[]}')?.heroSlot).toBeUndefined();
+    expect(parseVisionJson('{"derivedAttributes":{},"redFlags":[],"heroSlot":"  "}')?.heroSlot).toBeUndefined();
+  });
+
   it("returns null on non-JSON", () => {
     expect(parseVisionJson("I could not read the images.")).toBeNull();
   });

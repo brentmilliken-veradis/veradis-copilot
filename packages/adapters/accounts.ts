@@ -37,6 +37,15 @@ export type AccountsReportPatch =
       file_path: string;
       pcs_score?: number;
       valuation?: string;
+      /** Sealed tier (gold/silver/bronze/flagged) for the account's colour chip.
+       *  Written even when pcs_score is suppressed (capped/downgraded): the tier
+       *  itself is honest — a capped report is 'flagged', a downgrade is the
+       *  lower sealed tier — so the chip never implies a confidence not sealed. */
+      tier?: string;
+      /** object-photos storage path of the photo that best shows the object
+       *  itself (vision-chosen) — the collection card's hero, so the owner sees
+       *  the coin, not its COA. */
+      hero_path?: string;
       delivered_at: string;
     }
   | { status: "refunded" };

@@ -189,8 +189,10 @@ function whyBox(s: ReportSnapshot): string {
 
 function heroBlock(s: ReportSnapshot, images: ReportImage[]): string {
   const bySlot = new Map(images.map((i) => [i.slot, i]));
-  // Prefer an obverse/front/hero view for the hero; else the first image.
-  const heroKey = ["obverse", "front", "hero", "reverse"].find((k) => bySlot.has(k));
+  // Vision's pick of the object-itself photo wins (a coin, not its COA); else a
+  // slot heuristic; else the first image.
+  const heroKey = (s.heroSlot && bySlot.has(s.heroSlot) ? s.heroSlot : undefined)
+    ?? ["obverse", "front", "hero", "reverse"].find((k) => bySlot.has(k));
   const hero = (heroKey ? bySlot.get(heroKey) : images[0]) ?? null;
 
   const heroImg = hero
@@ -198,7 +200,7 @@ function heroBlock(s: ReportSnapshot, images: ReportImage[]): string {
     : `<div class="hero-ph"><span class="hero-ph-mark">◆</span><span>${s.evidence.length} photographs on file — hashed at intake</span></div>`;
 
   const tiles = (images.length ? images : s.evidence.map((e) => ({ slot: e.slot, label: undefined, dataUri: "" })))
-    .slice(0, 6)
+    .slice(0, 12) // one tile per photo (the strip wraps); bounded only as a runaway guard
     .map((t) => {
       const label = esc((("label" in t && t.label) || humanize(t.slot)).toUpperCase());
       const inner = t.dataUri

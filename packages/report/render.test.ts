@@ -74,4 +74,23 @@ describe("renderReport — reproduce the 2007 RCM proof-set fixture (E6)", () =>
     expect(v1.evidence).toHaveLength(9);
     for (const e of v1.evidence) expect(e.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
+
+  it("uses vision's heroSlot for the hero image, not the first/obverse photo", () => {
+    const imgs = [
+      { slot: "obverse", dataUri: "data:image/jpeg;base64,OBV" },
+      { slot: "slab_label", dataUri: "data:image/jpeg;base64,COA" },
+    ];
+    // Vision named the object photo (obverse) even though a COA image is present.
+    const withHero = { ...buildCoin2007(1), heroSlot: "obverse" } as typeof v1;
+    const html = renderReport(withHero, { images: imgs });
+    expect(html).toContain('class="hero-img" src="data:image/jpeg;base64,OBV"');
+
+    // If vision instead pointed at the COA slot, THAT becomes the hero (the pick
+    // is vision's; the renderer honours it) — proving the wiring is load-bearing.
+    const coaHero = { ...buildCoin2007(1), heroSlot: "slab_label" } as typeof v1;
+    expect(renderReport(coaHero, { images: imgs })).toContain('class="hero-img" src="data:image/jpeg;base64,COA"');
+
+    // No heroSlot → falls back to the obverse-first heuristic.
+    expect(renderReport(buildCoin2007(1), { images: imgs })).toContain('class="hero-img" src="data:image/jpeg;base64,OBV"');
+  });
 });

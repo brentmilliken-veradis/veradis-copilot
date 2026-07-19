@@ -31,6 +31,9 @@ export interface IngestResult {
   redFlags: VisionRedFlag[];
   c2pa: Record<string, C2paState>;
   rerouted: boolean;
+  /** Vision's pick of the photo slot that best shows the object itself (for the
+   *  report hero + collection card). Undefined when vision named none / is stubbed. */
+  heroSlot?: string;
 }
 
 const norm = (v: string): string => v.trim().toLowerCase();
@@ -118,5 +121,6 @@ export async function ingest(
     redFlags,
     c2pa: vr.c2pa,
     rerouted,
+    heroSlot: vr.heroSlot,
   };
 }

@@ -140,6 +140,11 @@ export interface ReportSnapshot {
     basis: string;
   };
   object: SnapshotObject;
+  /** Vision's pick of the evidence slot that best shows the object itself (coin,
+   *  watch, painting) — used for the report hero and the collection card so the
+   *  owner recognises the object, not its certificate/box. Omitted when vision
+   *  named none; the renderer then falls back to a slot heuristic. */
+  heroSlot?: string;
   evidence: SnapshotEvidence[];
   checks: SnapshotCheck[];
   citations: SnapshotCitation[];

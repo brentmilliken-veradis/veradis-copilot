@@ -81,6 +81,7 @@ async function assembleSnapshot(
   valuation: Valuation | undefined,
   narrativeSections: ReportSnapshot["narrative"],
   capReason: ReportSnapshot["capReason"],
+  heroSlot: string | undefined,
 ): Promise<ReportSnapshot> {
   const labels = new Map(profile.identityKeys.map((k) => [k.key, k.label]));
   const citations = await repo.listCitations(report.id);
@@ -133,6 +134,9 @@ async function assembleSnapshot(
       declaredAttributes,
       resolvedAttributes,
     },
+    // Only when vision named a slot that a photo actually occupies — never a
+    // dangling reference the renderer can't resolve.
+    ...(heroSlot && evidence.some((e) => e.slot === heroSlot) ? { heroSlot } : {}),
     evidence,
     checks,
     citations: snapCitations,
@@ -270,6 +274,7 @@ export async function runProvisional(
     valuation,
     narrative,
     capReason,
+    ing.heroSlot,
   );
   const sealed = sealVersion(snapshot0); // v1, no predecessor
 
