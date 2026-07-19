@@ -11,6 +11,9 @@ import { runEnrichmentJobs } from "@/packages/enrich/living";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// Enrich jobs draft narratives + roll up valuations across a collection; give
+// the tick the same headroom as the report poller rather than the 60s default.
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const denied = checkCronAuth(request); // F-3: fails closed without CRON_SECRET
