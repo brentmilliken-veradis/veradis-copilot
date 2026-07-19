@@ -5,7 +5,7 @@ describe("deriveProvenanceCustody", () => {
   it("absent / empty notes contribute nothing (existing behaviour unchanged)", () => {
     for (const n of [undefined, null, "", "   "]) {
       const p = deriveProvenanceCustody(n);
-      expect(p).toEqual({ coverage: 0, quality: 0, events: 0, signals: [] });
+      expect(p).toEqual({ coverage: 0, quality: 0, events: 0, signals: [], firstOwnerFromNew: false, completeTimeline: false });
     }
   });
 
@@ -16,16 +16,35 @@ describe("deriveProvenanceCustody", () => {
   });
 
   it("a described single-owner, sealed, original-packaging history lifts custody", () => {
+    // No "from new" phrasing → a partial narrative: shifts the estimate but adds
+    // NO trial (the CI stays wide), and is not a complete timeline.
     const p = deriveProvenanceCustody(
-      "Single owner from new, still sealed in the original packaging with intact foil.",
+      "Single owner, still sealed in the original packaging with intact foil.",
     );
     const keys = p.signals.map((s) => s.key);
     expect(keys).toContain("single_owner");
     expect(keys).toContain("original_packaging");
     expect(keys).toContain("sealed");
     expect(p.coverage).toBeGreaterThan(0);
-    // Narrative-only signals shift the estimate but add NO trial (CI stays wide).
+    expect(p.completeTimeline).toBe(false);
     expect(p.events).toBe(0);
+  });
+
+  it("a single-owner-FROM-NEW, packaged history is a COMPLETE timeline (full coverage + trials)", () => {
+    const p = deriveProvenanceCustody(
+      "Single owner from new, still sealed in its original packaging with intact foil.",
+    );
+    expect(p.firstOwnerFromNew).toBe(true);
+    expect(p.completeTimeline).toBe(true); // from-new + original packaging (corroborating doc)
+    expect(p.coverage).toBeGreaterThanOrEqual(0.45); // not the 0.35 partial cap
+    expect(p.events).toBeGreaterThan(0); // a coherent complete record earns trials
+  });
+
+  it("from-new WITHOUT documents is NOT a complete timeline — a bare claim stays capped", () => {
+    const p = deriveProvenanceCustody("Owned from new, never sold.");
+    expect(p.firstOwnerFromNew).toBe(true);
+    expect(p.completeTimeline).toBe(false); // no COA / receipt / packaging / chain to back it
+    expect(p.coverage).toBeLessThanOrEqual(0.35);
   });
 
   it("documented-evidence signals (receipt / papers / chain) add custody trials", () => {
@@ -39,14 +58,18 @@ describe("deriveProvenanceCustody", () => {
     expect(p.events).toBeGreaterThanOrEqual(3); // each evidence signal is a trial
   });
 
-  it("credit is CAPPED — a description stuffed with every signal can never max custody", () => {
+  it("credit is BOUNDED — even a complete documented history never reaches 1.0 from prose", () => {
     const everything =
       "Single owner from new, original packaging, sealed with intact foil, original receipt, " +
       "certificate of authenticity and warranty card, purchased from the estate of the first owner, " +
       "provenance documented since 1972, ex-collection, chain of ownership complete.";
     const p = deriveProvenanceCustody(everything);
-    expect(p.coverage).toBeLessThanOrEqual(0.35);
-    expect(p.quality).toBeLessThanOrEqual(0.2);
+    // A complete timeline lifts the cap to the complete-record ceiling (0.45 /
+    // 0.25), NOT to 1.0 — so prose alone still can't max custody. Combined with
+    // the 0.5 base in enrich this is coverage 0.95, quality 0.95: high, not perfect.
+    expect(p.coverage).toBeLessThanOrEqual(0.45);
+    expect(p.quality).toBeLessThanOrEqual(0.25);
+    expect(p.completeTimeline).toBe(true);
   });
 
   it("is deterministic — same notes, same result", () => {

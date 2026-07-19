@@ -90,12 +90,20 @@ export function composeScore(q: Quadrants, meta: ComposeMeta): PcsScore {
     risk: q.risk.populated,
   });
   const riskOverride = q.risk.flags.includes("COMPOSITE_OVERRIDE_FLAGGED");
-  const tier = mapToTier({
+  let tier = mapToTier({
     isScoreable: scoreable,
     withheldDisclosure: meta.withheldDisclosure,
     riskOverrideFlagged: riskOverride,
     ciLo: ci.lo,
   });
+  // A confirmed forensic material inconsistency (redial, cast seam, wrong metal,
+  // re-engraving) is a fake tell — it can NEVER present as a confident Gold/Silver,
+  // however strong identity, custody and provenance look. A polished story on a
+  // physically-wrong object is precisely the confident-wrong we refuse. Cap to
+  // Bronze (disclosed); anything already Bronze/Flagged is left as-is.
+  if (q.material.flags.includes("MATERIAL_INCONSISTENCY") && (tier === "gold" || tier === "silver")) {
+    tier = "bronze";
+  }
 
   const quadrants: QuadrantScore[] = [
     { quadrant: "identity", raw: round2(q.identity.raw), weightUsed: q.identity.totalWeight, ci: quadrantInterval(q.identity, meta, 0, false) },
@@ -125,7 +133,7 @@ export function scorePcs(inputs: ScoreInputs): PcsScore {
       identity: scoreIdentity(inputs.identity),
       custody: scoreCustody(inputs.custody),
       material: scoreMaterial(inputs.material),
-      risk: scoreRisk(inputs.risk, inputs.alrEnabled, inputs.theftRegistryChecked ?? false),
+      risk: scoreRisk(inputs.risk, inputs.alrEnabled, inputs.theftRegistryChecked ?? false, inputs.firstOwnerFromNew ?? false),
     },
     {
       objectId: inputs.objectId,

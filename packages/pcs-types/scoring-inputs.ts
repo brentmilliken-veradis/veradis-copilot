@@ -76,4 +76,11 @@ export interface ScoreInputs {
    *  register was not queried, the risk raw is unchanged (already 90-capped for
    *  partial coverage) but it earns no extra confidence. */
   theftRegistryChecked?: boolean;
+  /** True when provenance establishes UNBROKEN ownership from new (single owner
+   *  from new / bought new). The stolen-property register is then moot — theft
+   *  risk is answered by the provenance itself, not by a screen we skipped — so
+   *  Risk resolves clean (the ALR partial-coverage cap does not apply) and earns
+   *  a second resolved trial. You do not run a stolen-property check on a coin
+   *  someone has owned since it was minted. */
+  firstOwnerFromNew?: boolean;
 }
