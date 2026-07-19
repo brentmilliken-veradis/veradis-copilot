@@ -165,3 +165,63 @@ describe("getNumistaAdapter", () => {
     else process.env.NUMISTA_API_KEY = prev;
   });
 });
+
+import { parseWatchResolution, ClaudeWatchSourceAdapter, getWatchArchiveAdapter } from "./source";
+
+// The watch reference resolver — Tier-1 identity for watches. Honesty guards:
+// a close needs a cited URL AND a confirmed reference; a disagreement is demoted
+// to an advisory correction, never credited.
+describe("parseWatchResolution", () => {
+  const IK = ["brand", "reference", "serial_number", "movement_calibre", "dial_configuration"];
+  const attrs = { brand: "Omega", reference: "311.30.42.30.01.005", serial_number: "87xxxxxx", dial_configuration: "black" };
+
+  it("confirms a clearly-resolved, agreeing reference with a citation + reads new fields", () => {
+    const res = parseWatchResolution(JSON.stringify({
+      matched: true,
+      url: "https://www.omegawatches.com/watch-311-30-42-30-01-005",
+      confirmed: { brand: "Omega", reference: "311.30.42.30.01.005", movement_calibre: "1861", dial_configuration: "black" },
+      note: "Speedmaster Professional Moonwatch, calibre 1861",
+    }), attrs, IK);
+    expect(res?.matched).toBe(true);
+    expect(res?.confirmedKeys).toMatchObject({ brand: "Omega", reference: "311.30.42.30.01.005", movement_calibre: "1861" });
+    expect(res?.url).toContain("omegawatches.com");
+  });
+
+  it("refuses to close without a citation URL", () => {
+    const res = parseWatchResolution(JSON.stringify({ matched: true, confirmed: { reference: "311.30.42.30.01.005" } }), attrs, IK);
+    expect(res?.matched).toBe(false);
+  });
+
+  it("refuses to close when the reference itself is not confirmed (brand alone is not identity)", () => {
+    const res = parseWatchResolution(JSON.stringify({
+      matched: true, url: "https://example.com/x", confirmed: { brand: "Omega" },
+    }), attrs, IK);
+    expect(res?.matched).toBe(false);
+  });
+
+  it("demotes a disagreeing field to an advisory correction, never credits it", () => {
+    const res = parseWatchResolution(JSON.stringify({
+      matched: true, url: "https://www.chrono24.com/omega/x.htm",
+      confirmed: { reference: "311.30.42.30.01.005" },
+      corrected: { movement_calibre: "3861" }, // owner read 1861; source says 3861
+    }), { ...attrs, movement_calibre: "1861" }, IK);
+    expect(res?.matched).toBe(true);
+    expect(res?.confirmedKeys.movement_calibre).toBeUndefined();
+    expect(res?.correctedKeys?.movement_calibre).toBe("3861");
+  });
+
+  it("no clear match → not matched; malformed → null", () => {
+    expect(parseWatchResolution(JSON.stringify({ matched: false }), attrs, IK)?.matched).toBe(false);
+    expect(parseWatchResolution("the watch could not be resolved", attrs, IK)).toBeNull();
+  });
+});
+
+describe("getWatchArchiveAdapter", () => {
+  afterEach(() => { delete process.env.VISION_API_KEY; delete process.env.ANTHROPIC_API_KEY; });
+  it("returns the live resolver when a web-search key is set, else the stub", () => {
+    delete process.env.VISION_API_KEY; delete process.env.ANTHROPIC_API_KEY;
+    expect(getWatchArchiveAdapter().name).toBe("Brand archive extract"); // stub
+    process.env.VISION_API_KEY = "k";
+    expect(getWatchArchiveAdapter()).toBeInstanceOf(ClaudeWatchSourceAdapter);
+  });
+});
