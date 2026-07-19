@@ -19,6 +19,9 @@ import type { Emailer } from "@/packages/adapters/email";
 import { normalizePhoto } from "@/packages/adapters/photos";
 import { deliverReport, settleRefund, type DeliveryTarget } from "@/packages/delivery/bridge";
 import { buildReportImages } from "@/packages/report/images";
+import { createHash } from "node:crypto";
+
+const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 import { runProvisional, type PipelineAdapters } from "@/packages/pipeline/run";
 import { toOrderIntake, type ParsedVeradisIntake } from "@/packages/intake/veradis";
 import { categoryHasProfile } from "@/packages/profiles/loader";
@@ -397,7 +400,16 @@ export async function processAccountsReport(
   } catch (e) {
     console.warn(`report poller ${row.id}: report images skipped — ${(e as Error).message}`);
   }
-  const delivery = await deliverReport(deps.accounts, result.report, result.version, undefined, { images });
+  // Map vision's hero slot back to the owner's object-photos path (upload order:
+  // photos[i] came from obj.photo_paths[i]; evidence names the slot per SHA-256).
+  let heroPath: string | undefined;
+  const heroSlot = result.snapshot.heroSlot;
+  if (heroSlot && obj.photo_paths?.length) {
+    const heroSha = result.snapshot.evidence.find((e) => e.slot === heroSlot)?.sha256;
+    const idx = heroSha ? photos.findIndex((p) => sha256Hex(p.bytes) === heroSha) : -1;
+    if (idx >= 0 && idx < obj.photo_paths.length) heroPath = obj.photo_paths[idx];
+  }
+  const delivery = await deliverReport(deps.accounts, result.report, result.version, undefined, { images, heroPath });
 
   // A refund state (unscored / withheld) is settled to `refunded` on the
   // accounts row — terminal, no deliverable, no curator email.

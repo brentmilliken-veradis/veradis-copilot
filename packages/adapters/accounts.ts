@@ -42,6 +42,10 @@ export type AccountsReportPatch =
        *  itself is honest — a capped report is 'flagged', a downgrade is the
        *  lower sealed tier — so the chip never implies a confidence not sealed. */
       tier?: string;
+      /** object-photos storage path of the photo that best shows the object
+       *  itself (vision-chosen) — the collection card's hero, so the owner sees
+       *  the coin, not its COA. */
+      hero_path?: string;
       delivered_at: string;
     }
   | { status: "refunded" };

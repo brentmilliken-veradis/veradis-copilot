@@ -40,9 +40,10 @@ export async function deliverReport(
   report: Report, // report.orderId = veradis-accounts reports.id (E-C contract)
   version: ReportVersion,
   now: () => string = () => new Date().toISOString(),
-  /** Object photos to inline into the report HTML (hero + evidence strip). Built
+  /** Object photos to inline into the report HTML (hero + evidence strip), and
+   *  the object-photos path of the vision-chosen hero for the account card. Built
    *  at delivery from the owner's uploads; never stored in the snapshot. */
-  opts: { images?: ReportImage[] } = {},
+  opts: { images?: ReportImage[]; heroPath?: string } = {},
 ): Promise<DeliveryResult> {
   const isRefund = REFUND_STATES.has(report.status);
   if (!isRefund && !DELIVERABLE.has(report.status)) {
@@ -100,6 +101,8 @@ export async function deliverReport(
     // 'flagged' and a downgrade's lower tier are both honest); only the bare
     // NUMBER is suppressed above.
     tier: version.tier ?? undefined,
+    // Vision-chosen hero for the collection card (the object, not its COA).
+    hero_path: opts.heroPath,
     // A2 (defense-in-depth): a capped report can never be confirmed and so
     // never carries an expert band — but cap-guard the valuation too, for
     // symmetry with the score, so a cap can never leak a bare number either way.

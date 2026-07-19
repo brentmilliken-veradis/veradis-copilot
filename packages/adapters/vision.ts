@@ -32,6 +32,11 @@ export interface VisionResult {
   redFlags: VisionRedFlag[];
   /** C2PA state per evidence slot (gate ④). */
   c2pa: Record<string, C2paState>;
+  /** The slot of the photo that best shows the OBJECT ITSELF (the coin, watch,
+   *  painting…) — not its certificate, box, or packaging — for the report hero
+   *  and the collection card. Vision picks it because slot/upload order can't
+   *  tell a coin from its COA. Omitted when no image clearly shows the object. */
+  heroSlot?: string;
 }
 
 export interface VisionAdapter {
@@ -55,6 +60,7 @@ export class StubVisionAdapter implements VisionAdapter {
       derivedAttributes: s?.derivedAttributes ?? { ...req.declaredAttributes },
       derivedCategory: s?.derivedCategory,
       redFlags: s?.redFlags ?? [],
+      heroSlot: s?.heroSlot,
       // Default: content credentials absent (most consumer photos have none).
       c2pa: s?.c2pa ?? Object.fromEntries(req.evidence.map((e) => [e.slot, "absent" as C2paState])),
     };
@@ -89,8 +95,9 @@ const VISION_SYSTEM = [
   "- The owner's typed attributes are a HYPOTHESIS. Report a different value only when the images clearly contradict it.",
   `- derivedCategory: include ONLY if the object is clearly a different category than declared. Allowed values: ${ALL_CATEGORIES.join(", ")}.`,
   "- redFlags: physical warning signs visible in the images (casting seams, re-engraving, cleaning hairlines, renamed rims, redials, over-restoration). Each needs the slot it was seen in and a short factual note. Empty array if none.",
+  "- heroSlot: the capture slot of the ONE image that best shows the OBJECT ITSELF — the coin, watch, painting, medal — clearly and recognisably. NEVER pick a certificate of authenticity, a box, a case, packaging, a document, or a receipt. Prefer a clean, well-lit, front-facing view of the object. If no image clearly shows the object, omit heroSlot.",
   "- You NEVER score, grade, value, or authenticate. You read attributes and flag observations.",
-  'Return ONLY a JSON object: {"derivedAttributes": {<key>: <string value>}, "derivedCategory": <string, optional>, "redFlags": [{"key": string, "evidenceSlot": string, "note": string}]}. Nothing outside the JSON.',
+  'Return ONLY a JSON object: {"derivedAttributes": {<key>: <string value>}, "derivedCategory": <string, optional>, "redFlags": [{"key": string, "evidenceSlot": string, "note": string}], "heroSlot": <string, optional>}. Nothing outside the JSON.',
 ].join("\n");
 
 function visionUserText(req: VisionRequest): string {
@@ -110,6 +117,7 @@ interface RawVisionJson {
   derivedAttributes?: unknown;
   derivedCategory?: unknown;
   redFlags?: unknown;
+  heroSlot?: unknown;
 }
 
 /** Defensive parse of Claude's JSON into the VisionResult shape (minus c2pa).
@@ -148,7 +156,9 @@ export function parseVisionJson(text: string): Omit<VisionResult, "c2pa"> | null
     }
   }
 
-  return { derivedAttributes, derivedCategory, redFlags };
+  const heroSlot = typeof parsed.heroSlot === "string" && parsed.heroSlot.trim() ? parsed.heroSlot.trim() : undefined;
+
+  return { derivedAttributes, derivedCategory, redFlags, heroSlot };
 }
 
 function toBase64(bytes: Uint8Array): string {

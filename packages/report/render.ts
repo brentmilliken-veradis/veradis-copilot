@@ -189,8 +189,10 @@ function whyBox(s: ReportSnapshot): string {
 
 function heroBlock(s: ReportSnapshot, images: ReportImage[]): string {
   const bySlot = new Map(images.map((i) => [i.slot, i]));
-  // Prefer an obverse/front/hero view for the hero; else the first image.
-  const heroKey = ["obverse", "front", "hero", "reverse"].find((k) => bySlot.has(k));
+  // Vision's pick of the object-itself photo wins (a coin, not its COA); else a
+  // slot heuristic; else the first image.
+  const heroKey = (s.heroSlot && bySlot.has(s.heroSlot) ? s.heroSlot : undefined)
+    ?? ["obverse", "front", "hero", "reverse"].find((k) => bySlot.has(k));
   const hero = (heroKey ? bySlot.get(heroKey) : images[0]) ?? null;
 
   const heroImg = hero
