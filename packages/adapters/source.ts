@@ -296,16 +296,21 @@ export class NumistaSourceAdapter implements SourceAdapter {
       }
     }
 
-    // Matched only when the catalogue clearly identifies THIS coin: right issuer,
-    // any provided year/denomination must AGREE (never confirm against a wrong-
-    // denomination candidate), and at least one strong signal beyond country.
+    // Matched only when the catalogue clearly identifies THIS object: right issuer,
+    // any provided year/denomination must AGREE, and — critically — the DENOMINATION
+    // or a distinctive TITLE topic must positively match. Country + year alone is NOT
+    // an identification: it would confirm a proof set against a random 1-cent of the
+    // same year. A thing we can't distinguish from a penny, we do not confirm.
     const denomProvided = !!attributes.denomination;
     const yearProvided = !Number.isNaN(year);
+    const topics = titleTopics(attributes.title).split(" ").filter((t) => t.length >= 4);
+    const bestText = denomText(detail);
+    const topicMatched = topics.length > 0 && topics.some((t) => bestText.includes(t));
     const matched =
       countryOk &&
       (!yearProvided || yearOk) &&
       (!denomProvided || denomOk) &&
-      (yearOk || denomOk);
+      (denomOk || topicMatched);
     if (!matched) return none;
     return {
       matched: true,
