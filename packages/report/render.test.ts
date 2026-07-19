@@ -56,7 +56,7 @@ describe("renderReport — reproduce the 2007 RCM proof-set fixture (E6)", () =>
 
   it("carries the hash chain + verify permalink (gate ⑥)", () => {
     const html = renderReport(v2);
-    expect(html).toContain("Snapshot hash");
+    expect(html).toContain("Data snapshot hash");
     expect(v2.snapshotSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(html).toContain(v2.snapshotSha256!);
     // v02 chains onto v01's content hash

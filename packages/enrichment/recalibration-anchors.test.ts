@@ -101,4 +101,41 @@ describe("recalibration anchors — Gold rises, fakes and bare cases stay down",
     expect(r.tier).not.toBe("gold");
     expect(r.tier).not.toBe("silver");
   });
+
+  // Anchor for the OTHER Gold path in production: an 8-coin proof SET is not a
+  // single catalogue coin — matching it to one scored it against a penny. Identity
+  // must come from the issuer's certificate (vision reads the SKU / serial mintage
+  // off the case + COA), and a documented from-new set must still reach GOLD.
+  // Ground truth: the 2007 Thayendanegea proof set (barcode 623932 60007 2).
+  it("2007 proof SET — issuer-certificate identity + documented from-new → GOLD (no penny match)", async () => {
+    const noCatalogue: SourceAdapter = {
+      name: "Numista", tier: 1, role: "ground_truth", categories: ["coins"],
+      async lookup() {
+        return { adapter: "Numista", tier: 1, role: "ground_truth" as const, matched: false, name: "Numista", retrievalState: "pending" as const };
+      },
+      async resolveObject(): Promise<ObjectResolution> {
+        return { matched: false, sourceName: "Numista", tier: 1, confirmedKeys: {} };
+      },
+    };
+    const SET_DECLARED = { country: "Canada", denomination: "Proof Set", year: "2007", mint_mark: "RCM", variety: "Proof", title: "Canadian Proof Set 2007" };
+    const SET_NOTES = "Single owner from new. Received as a gift from Robert Milliken (my father) in 2007. Documents held: certificate of authenticity, original box and case.";
+
+    const repo = new InMemoryRepository();
+    const r0 = await repo.createReport({ orderId: "o-set2007", objectId: "set-2007", category: "coins" });
+    const report = await repo.updateReport(r0.id, { status: "paid" });
+    // SKU + serial mintage were READ off the case / COA by vision (not declared).
+    const resolved = { ...SET_DECLARED, notes: SET_NOTES, sku: "623932 60007 2", mintage: "35606 / 60000" };
+    const enr = await enrich(
+      repo,
+      { sources: [noCatalogue], embedder: new StubEmbeddingAdapter(), graph: new StubGraphAdapter(), sanctions: new StubSanctionsAdapter() },
+      { report, profile: loadProfile("coins"), declaredAttributes: { ...SET_DECLARED, notes: SET_NOTES }, resolvedAttributes: resolved, redFlags: [] },
+    );
+    const s = scorePcs(enr.scoreInputs);
+    expect(s.tier).toBe("gold");
+    expect(s.ci.lo).toBeGreaterThanOrEqual(80);
+    // Identity closed by the issuer certificate — NOT a random catalogue coin.
+    const cites = await repo.listCitations(report.id);
+    expect(cites.some((c) => c.name === "Issuer certificate of authenticity")).toBe(true);
+    expect(enr.scoreInputs.firstOwnerFromNew).toBe(true);
+  });
 });

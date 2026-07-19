@@ -9,7 +9,7 @@
 
 import type { Report, ReportVersion } from "@/packages/pcs-types";
 import type { VeradisAccountsClient } from "@/packages/adapters/accounts";
-import { renderReport } from "@/packages/report/render";
+import { renderReport, type ReportImage } from "@/packages/report/render";
 import { markStubbed } from "@/packages/adapters/stub-registry";
 
 /** The slice of the accounts client the bridge needs (structural, so the
@@ -40,6 +40,9 @@ export async function deliverReport(
   report: Report, // report.orderId = veradis-accounts reports.id (E-C contract)
   version: ReportVersion,
   now: () => string = () => new Date().toISOString(),
+  /** Object photos to inline into the report HTML (hero + evidence strip). Built
+   *  at delivery from the owner's uploads; never stored in the snapshot. */
+  opts: { images?: ReportImage[] } = {},
 ): Promise<DeliveryResult> {
   const isRefund = REFUND_STATES.has(report.status);
   if (!isRefund && !DELIVERABLE.has(report.status)) {
@@ -69,7 +72,7 @@ export async function deliverReport(
   }
 
   const snapshot = version.snapshotJson;
-  const html = renderReport(snapshot);
+  const html = renderReport(snapshot, { images: opts.images });
   const filePath = await accounts.uploadReportFile(row.user_id, row.id, html);
 
   // F-8: only a real expert-set band ever crosses the bridge — never 0–0,
