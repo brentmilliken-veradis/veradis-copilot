@@ -289,7 +289,10 @@ export async function enrich(
   // The owner's provenance description (notes) is custody documentation: a
   // described single-owner / sealed / papered history lifts coverage + quality
   // (capped — a claim, not proof), and documented-evidence signals add a trial.
-  const prov = deriveProvenanceCustody(declaredAttributes.notes);
+  // A MATERIAL red flag vetoes the complete-timeline lift (and the moot-register
+  // clean): a forged COA on a fake must not buy custody credit or clean risk.
+  const materialInconsistent = material.some((m) => m.present && m.consistency === "inconsistent");
+  const prov = deriveProvenanceCustody(declaredAttributes.notes, { suppressComplete: materialInconsistent });
   const baseCoverage = input.custodyHint?.coverage ?? 0.5;
   const coverage = Math.min(1, baseCoverage + links.reduce((a, l) => a + l.confidence * 0.1, 0) + prov.coverage);
   const custody: CustodyInput = {
@@ -364,16 +367,22 @@ export async function enrich(
       note: "no match on the sanctions / PEP screen on the check date",
     });
   }
+  // The stolen-property register is MOOT for a documented first-owner-from-new
+  // object — theft risk is answered by the unbroken provenance, not by a screen.
+  // So it resolves clean there (not an honest gap) without needing the paid add-on.
+  const registerMoot = prov.completeTimeline && !input.theftRegistryChecked;
   await repo.addCheck({
     reportId: report.id,
     quadrant: "risk",
     key: "stolen_registry",
-    result: input.theftRegistryChecked ? "match" : "gap_held_open",
-    authorityState: input.theftRegistryChecked ? "resolved" : "missing",
+    result: input.theftRegistryChecked || registerMoot ? "match" : "gap_held_open",
+    authorityState: input.theftRegistryChecked || registerMoot ? "resolved" : "missing",
     sourceId: null,
     note: input.theftRegistryChecked
       ? "no match in the stolen-property register on the check date; certificate issued"
-      : "stolen-property register not checked — available as a paid add-on",
+      : registerMoot
+        ? "unbroken ownership from new — stolen-property register not applicable to a first-owner-from-new object"
+        : "stolen-property register not checked — available as a paid add-on",
   });
 
   const scoreInputs: ScoreInputs = {
@@ -388,6 +397,8 @@ export async function enrich(
     withheldDisclosure: false,
     scaleFactor: SCALE_BY_CATEGORY[report.category] ?? 5,
     theftRegistryChecked: input.theftRegistryChecked ?? false,
+    // Documented unbroken-from-new provenance → Risk resolves clean (register moot).
+    firstOwnerFromNew: prov.completeTimeline,
   };
 
   return { report, profile, scoreInputs };

@@ -91,7 +91,12 @@ export function scoreMaterial(checks: MaterialCheckInput[]): QuadrantRaw {
  *  resolved risk trial → higher n_eff → tighter CI. It does NOT lift the raw
  *  (the 90 cap stands while ALR is off); its benefit is confidence, so it can
  *  raise the tier on the lower bound. The base case is unchanged. */
-export function scoreRisk(events: RiskEventInput[], alrEnabled: boolean, theftRegistryChecked = false): QuadrantRaw {
+export function scoreRisk(
+  events: RiskEventInput[],
+  alrEnabled: boolean,
+  theftRegistryChecked = false,
+  firstOwnerFromNew = false,
+): QuadrantRaw {
   let score = 100;
   let hasHigh = false;
   for (const e of events) {
@@ -101,13 +106,18 @@ export function scoreRisk(events: RiskEventInput[], alrEnabled: boolean, theftRe
   score = Math.max(0, Math.min(100, score));
   const flags: string[] = [];
   if (hasHigh) flags.push("COMPOSITE_OVERRIDE_FLAGGED");
-  // §10.3 cap-with-disclosure while ALR is off.
-  if (!alrEnabled && score > ALR_RISK_CAP) {
+  // §10.3 cap-with-disclosure while ALR is off — UNLESS the stolen-property
+  // register is MOOT because provenance is unbroken from new. There the theft
+  // question is answered by the documented provenance, not by a screen we
+  // skipped, so the partial-coverage cap does not apply (you do not run a
+  // stolen-property check on an object owned since it was new).
+  if (!alrEnabled && !firstOwnerFromNew && score > ALR_RISK_CAP) {
     score = ALR_RISK_CAP;
     flags.push("STOLEN_REGISTRY_PARTIAL_COVERAGE");
   }
-  // One trial for the sanctions/PEP screen (always run); the stolen-property
-  // register is a second trial only when the add-on cleared it.
-  const totalWeight = theftRegistryChecked ? 2 : 1;
+  // Sanctions/PEP screen is one trial (always run). A second resolved trial —
+  // tighter risk CI — when EITHER the paid register add-on ran OR the register is
+  // moot under unbroken-from-new provenance.
+  const totalWeight = theftRegistryChecked || firstOwnerFromNew ? 2 : 1;
   return { raw: score, totalWeight, missingWeight: 0, populated: true, flags };
 }

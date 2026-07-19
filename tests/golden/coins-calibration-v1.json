@@ -31,6 +31,14 @@
       "expectedTierNote": "Silver as documented (custody thin in the reference evidence). Full provenance — sealed COA + purchase receipt — lifts it to Gold; the v01→v02 anchor ladder proves that rung. A genuine set is never Flagged.",
       "groundTruthSource": "Genuine owner-held RCM proof set; documentary record (RCM 2007 issue) corroborated by PCGS + Numista Tier-1.",
       "validated": true
+    },
+    {
+      "id": "RCM-2004-POPPY-DOLLAR",
+      "name": "2004 Canada 'Poppy' proof silver dollar — single owner from new, RCM casing + COA",
+      "expectedTier": "gold",
+      "expectedTierNote": "GOLD. Numista Tier-1 confirms the type (country/year/denomination/mint, #27776); a documented single-owner-from-new provenance (RCM casing + red box + serial COA no. 03340) is a COMPLETE ownership record (custody coverage 0.95, quality 0.95), and the stolen-property register is moot for a first-owner-from-new object (Risk resolves clean). Composite 93.33, CI lower bound 85.7. Proven end-to-end by recalibration-anchors.test.ts. The SAME coin with identity confirmed but NO provenance stays Silver; a material red flag can never present as Gold/Silver.",
+      "groundTruthSource": "Genuine owner-held 2004 RCM 'Poppy' proof silver dollar; identity corroborated by Numista Tier-1 (en.numista.com/27776); provenance owner-documented (COA no. 03340, original RCM packaging).",
+      "validated": true
     }
   ]
 }
