@@ -71,4 +71,11 @@ export interface CategoryProfile {
   materialSlotClass?: string;
   /** Overrides the default 30/30/25/15 composite if present. */
   componentWeights?: ComponentWeights;
+  /** An identity key that GATES the complete-provenance Gold lift: the lift only
+   *  applies when this key is confirmed by a Tier-1 source. Fine art sets
+   *  "artist" — a documented provenance chain reaches Gold only when the artist
+   *  is positively confirmed as a documented artist (an unknown/unverifiable
+   *  attribution can't ride provenance alone to Gold). Absent = no gate (coins,
+   *  watches: the catalogue/reference IS the identity). */
+  goldGateIdentityKey?: string;
 }

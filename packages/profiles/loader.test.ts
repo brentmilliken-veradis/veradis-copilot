@@ -41,8 +41,8 @@ describe("profile loader", () => {
     expect(() => validateProfile(bad)).toThrow(/forbidden identity key/);
   });
 
-  it("loads the scaffold profiles (art, fine-china, silver, jewellery, luxury) validated", () => {
-    for (const cat of ["art", "fine-china", "silver", "jewellery", "luxury"] as const) {
+  it("loads the scaffold profiles (fine-china, silver, jewellery, luxury) validated", () => {
+    for (const cat of ["fine-china", "silver", "jewellery", "luxury"] as const) {
       const p = loadProfile(cat);
       expect(p.category).toBe(cat);
       expect(p.version).toBe(1);
@@ -86,7 +86,7 @@ describe("profile loader", () => {
       .filter((p) => p.calibration === "calibrated")
       .map((p) => `${p.category}@${p.version}`)
       .sort();
-    expect(calibrated).toEqual(["coins@1", "watches@1"]);
+    expect(calibrated).toEqual(["art@1", "coins@1", "watches@1"]);
   });
 
   it("seeds all built-in profiles into a repository", async () => {

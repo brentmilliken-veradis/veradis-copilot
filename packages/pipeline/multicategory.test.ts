@@ -31,25 +31,27 @@ function adapters(): PipelineAdapters {
 
 const enc = new TextEncoder();
 
-function artOrder(): OrderIntake {
+// A still-provisional scaffold category (luxury / handbags) — the F-1 cap example.
+// (Coins, watches and art are calibrated; the cap tests need an uncalibrated one.)
+function scaffoldOrder(): OrderIntake {
   return {
-    orderId: "ord-art-1",
-    objectId: "art-1",
-    category: "art",
+    orderId: "ord-lux-1",
+    objectId: "lux-1",
+    category: "luxury",
     sku: "verify",
     declaredAttributes: {
-      artist: "E. J. Hughes",
-      title: "Fishboats, Rivers Inlet",
-      medium: "oil on canvas",
-      dimensions: "76 x 96 cm",
-      signature_inscription: "signed lower right",
+      maison: "Hermès",
+      model: "Birkin 30",
+      date_code: "square Y",
+      material: "Togo leather",
+      hardware: "gold",
     },
-    ownerFacingName: "Fishboats, Rivers Inlet",
+    ownerFacingName: "Hermès Birkin 30",
     photos: [
       { filename: "front.jpg", bytes: enc.encode("FRONT") },
-      { filename: "signature.jpg", bytes: enc.encode("SIG") },
-      { filename: "verso.jpg", bytes: enc.encode("VERSO") },
-      { filename: "raking.jpg", bytes: enc.encode("RAKE") },
+      { filename: "stamp.jpg", bytes: enc.encode("STAMP") },
+      { filename: "hardware.jpg", bytes: enc.encode("HW") },
+      { filename: "interior.jpg", bytes: enc.encode("INT") },
     ],
   };
 }
@@ -57,13 +59,13 @@ function artOrder(): OrderIntake {
 describe("E-E multi-category scaffolds", () => {
   beforeEach(() => resetStubRegistry());
 
-  it("an art order runs end-to-end → tier capped to flagged, provisional, confirm blocked (F-1)", async () => {
+  it("an uncalibrated (luxury) order runs end-to-end → tier capped to flagged, provisional, confirm blocked (F-1)", async () => {
     const repo = new InMemoryRepository();
-    const res = await runProvisional(repo, new StubStorage(), adapters(), artOrder());
+    const res = await runProvisional(repo, new StubStorage(), adapters(), scaffoldOrder());
 
     expect(res.report.status).toBe("provisional");
     expect(res.snapshot.provisional).toBe(true);
-    expect(res.profile.category).toBe("art");
+    expect(res.profile.category).toBe("luxury");
 
     // F-1: an uncalibrated category can never present a confident tier.
     expect(res.snapshot.capReason).toBe("uncalibrated_category");
@@ -95,14 +97,14 @@ describe("E-E multi-category scaffolds", () => {
     expect(withheld.report.status).toBe("withheld");
   });
 
-  it("F-1: an art object that would score a confident tier still seals capped", async () => {
-    // A generous fake Tier-1 art source resolves every identity key — the raw
+  it("F-1: an uncalibrated object that would score a confident tier still seals capped", async () => {
+    // A generous fake Tier-1 source resolves every identity key — the raw
     // composite climbs, but the presented tier must stay capped.
     const artTier1 = {
-      name: "Fake Art Registry",
+      name: "Fake Registry",
       tier: 1 as const,
       role: "ground_truth" as const,
-      categories: ["art" as const],
+      categories: ["luxury" as const],
       async lookup(l: { key: string; value: string }) {
         return {
           adapter: "Fake Art Registry",
@@ -120,7 +122,7 @@ describe("E-E multi-category scaffolds", () => {
       repo,
       new StubStorage(),
       { ...adapters(), sources: [artTier1] },
-      artOrder(),
+      scaffoldOrder(),
     );
     // P2 counterfactual: the RAW deterministic tier must actually be confident
     // here — otherwise the test proves nothing about the cap. With every
