@@ -18,6 +18,7 @@ import type { Storage } from "@/packages/adapters/storage";
 import type { Emailer } from "@/packages/adapters/email";
 import { normalizePhoto } from "@/packages/adapters/photos";
 import { deliverReport, settleRefund, type DeliveryTarget } from "@/packages/delivery/bridge";
+import { buildReportImages } from "@/packages/report/images";
 import { runProvisional, type PipelineAdapters } from "@/packages/pipeline/run";
 import { toOrderIntake, type ParsedVeradisIntake } from "@/packages/intake/veradis";
 import { categoryHasProfile } from "@/packages/profiles/loader";
@@ -363,8 +364,9 @@ export async function processAccountsReport(
   // Production. A throw records the attempt; retry happens after the
   // staleness window, up to MAX_PRODUCTION_ATTEMPTS.
   let result;
+  let photos: PhotoInput[] = [];
   try {
-    const photos = await downloadPhotos(deps, obj);
+    photos = await downloadPhotos(deps, obj);
     if (!photos.length) throw new Error("no photos downloadable");
     result = await runProvisional(deps.repo, deps.storage, deps.adapters, toOrderIntake(parsed, photos));
   } catch (e) {
@@ -386,7 +388,16 @@ export async function processAccountsReport(
   }
   await deps.repo.updateOrder(row.id, { productionState: "produced", lastError: null });
 
-  const delivery = await deliverReport(deps.accounts, result.report, result.version);
+  // Inline the owner's actual photos into the delivered report HTML (hero +
+  // evidence strip). Best-effort: an image failure must never sink a produced
+  // report — deliver text-only and let the graceful placeholder stand in.
+  let images;
+  try {
+    images = await buildReportImages(photos, result.snapshot.evidence);
+  } catch (e) {
+    console.warn(`report poller ${row.id}: report images skipped — ${(e as Error).message}`);
+  }
+  const delivery = await deliverReport(deps.accounts, result.report, result.version, undefined, { images });
 
   // A refund state (unscored / withheld) is settled to `refunded` on the
   // accounts row — terminal, no deliverable, no curator email.
