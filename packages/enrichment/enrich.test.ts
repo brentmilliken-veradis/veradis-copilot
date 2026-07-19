@@ -97,6 +97,32 @@ describe("enrich (E4)", () => {
     expect(cites.some((c) => c.name === "Numista" && c.tier === 1 && (c.url ?? "").includes("27776"))).toBe(true);
   });
 
+  it("a vision-read issuer certificate confirms identity (documentary record) when no catalogue matches", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    const declared = { country: "Canada", denomination: "Proof Set", year: "2007", mint_mark: "RCM", variety: "Proof" };
+    // sku + serial-numbered mintage were READ off the case/COA by vision (not declared).
+    const resolved = { ...declared, sku: "623932 60007 2", mintage: "35606 / 60000" };
+    const res = await enrich(repo, adapters(), { report, profile: loadProfile("coins"), declaredAttributes: declared, resolvedAttributes: resolved, redFlags: [] });
+    expect(res.scoreInputs.identity.find((i) => i.key === "country")).toMatchObject({ credit: 1.0, authorityState: "resolved" });
+    const cites = await repo.listCitations(report.id);
+    expect(cites.some((c) => c.name === "Issuer certificate of authenticity")).toBe(true);
+  });
+
+  it("a material inconsistency VETOES the certificate — a forged cert on a physically-wrong object earns nothing", async () => {
+    const repo = new InMemoryRepository();
+    const report = await makeReport(repo);
+    const declared = { country: "Canada", denomination: "Proof Set", year: "2007", mint_mark: "RCM", variety: "Proof" };
+    const resolved = { ...declared, sku: "623932 60007 2" };
+    const res = await enrich(repo, adapters(), {
+      report, profile: loadProfile("coins"), declaredAttributes: declared, resolvedAttributes: resolved,
+      redFlags: [], materialHint: [{ key: "surface", weight: 1, consistency: "inconsistent", present: true }],
+    });
+    expect(res.scoreInputs.identity.find((i) => i.key === "country")?.authorityState).not.toBe("resolved");
+    const cites = await repo.listCitations(report.id);
+    expect(cites.some((c) => c.name === "Issuer certificate of authenticity")).toBe(false);
+  });
+
   it("corroborates via corpus but never closes the check (Tier-2)", async () => {
     const repo = new InMemoryRepository();
     const report = await makeReport(repo);

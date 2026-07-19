@@ -134,6 +134,22 @@ export async function enrich(
       })
     : null;
 
+  // Documentary identity (2026-07-19): a vision-READ issuer certificate — a
+  // serial-numbered COA or mint product SKU legible in the photos — is authoritative
+  // documentary evidence of what the object IS. It confirms the declared identity to
+  // the documentary-record standard (never "authenticated"), which is how a dealer
+  // verifies a set: the mint's own certificate says so. It is VETOED by a material
+  // inconsistency — a forged certificate on a physically-wrong object earns nothing.
+  const declaredHas = (k: string) => declaredAttributes[k] !== undefined && String(declaredAttributes[k]).trim() !== "";
+  const CERT_KEYS = ["certificate_number", "certificate", "sku", "serial", "serial_number"];
+  const visionReadCertificate =
+    CERT_KEYS.some((k) => resolvedAttributes[k] && !declaredHas(k)) ||
+    (!!resolvedAttributes.mintage && /\d\s*\/\s*\d/.test(resolvedAttributes.mintage) && !declaredHas("mintage"));
+  const materialInconsistentEarly = input.materialHint
+    ? input.materialHint.some((m) => m.present && m.consistency === "inconsistent")
+    : input.redFlags.some((f) => MATERIAL_FLAGS.has(f.key));
+  const certifiedIdentity = visionReadCertificate && !materialInconsistentEarly;
+
   const identity: IdentityCheckInput[] = [];
   for (const idKey of profile.identityKeys) {
     const value = resolvedAttributes[idKey.key];
@@ -168,6 +184,9 @@ export async function enrich(
         if (resolved) {
           t1Name = resolved.name;
           t1Url = resolved.url;
+        } else if (certifiedIdentity) {
+          // No catalogue match, but the issuer's own certificate documents it.
+          t1Name = "Issuer certificate of authenticity";
         }
       }
       if (t1Name) {
