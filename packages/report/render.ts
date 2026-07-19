@@ -99,7 +99,10 @@ function valuation(s: ReportSnapshot): string {
   if (!s.valuation) return "";
   const v = s.valuation;
   const comps = v.comps
-    .map((c) => `<tr><td>${esc(c.source)}</td><td>${esc(c.venue)}</td><td>${esc(c.date)}</td><td>${esc(c.result)}</td><td>${esc(c.basis)}</td></tr>`)
+    .map((c) => {
+      const src = c.url ? `<a href="${esc(c.url)}" rel="nofollow noopener">${esc(c.source)}</a>` : esc(c.source);
+      return `<tr><td>${src}</td><td>${esc(c.venue)}</td><td>${esc(c.date)}</td><td>${esc(c.result)}</td><td>${esc(c.basis)}</td></tr>`;
+    })
     .join("");
   const actions = v.actions
     .map((a) => `<li>${esc(a.action)} <span class="eff">${esc(a.expectedBandEffect)}</span></li>`)
@@ -125,8 +128,8 @@ function valuation(s: ReportSnapshot): string {
   return `<section class="appraise"><h2>Indicative fair market value</h2>
     ${head}
     ${factorsBlock}
-    <h3>Comparable sales</h3>
-    <table><thead><tr><th>Source</th><th>Venue</th><th>Date</th><th>Result</th><th>Basis</th></tr></thead><tbody>${comps}</tbody></table>
+    ${v.comps.length ? `<h3>Comparable sales</h3>
+    <table><thead><tr><th>Source</th><th>Venue</th><th>Date</th><th>Result</th><th>Basis</th></tr></thead><tbody>${comps}</tbody></table>` : ""}
     <h3>Actions</h3><ol class="actions">${actions}</ol></section>`;
 }
 

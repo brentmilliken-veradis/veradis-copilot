@@ -251,6 +251,7 @@ export async function runProvisional(
           fmvHi: est.fmvHi,
           marketInterest: est.marketInterest,
           factors: est.factors,
+          comps: est.comps,
           indicative: true,
           basis: est.basis,
           estimateConfidence: est.confidence,

@@ -64,6 +64,9 @@ export interface Comp {
   result: string;
   basis: string;
   fx?: string;
+  /** Citation for the comp — a real listing / sale URL. A comp WITHOUT a source
+   *  URL is not accepted from the valuation adapter (no fabricated sales). */
+  url?: string;
 }
 
 export interface Factor {

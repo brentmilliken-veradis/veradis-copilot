@@ -7,15 +7,18 @@
 // — under expert review" (the F-8 default). The authoritative band is still
 // expert-set at curator confirm.
 //
+// The adapter uses Claude's server-side WEB SEARCH to find REAL comparable
+// listings / sales (dealers, eBay, auction) for the resolved object, and prices
+// the band from them.
+//
 // HONESTY GUARDS baked in below (not just prompt-deep):
-//  - No fabricated comparable sales. The model is told it has no live market feed
-//    and returns NO comps; the engine forces `comps: []`. A real price source can
-//    populate comps later with genuine data.
+//  - Comps must be CITED. A comparable is accepted only with a real source URL;
+//    an uncited "sale" is dropped. No fabricated auction results.
 //  - A defensible WIDE range or nothing: an unusable / degenerate / inverted band
 //    is dropped to null → the report falls back to "under expert review".
 //  - The estimate is labelled indicative and confidence is capped at "moderate".
 
-import type { Category, Factor } from "@/packages/pcs-types";
+import type { Category, Comp, Factor } from "@/packages/pcs-types";
 import { markStubbed } from "./stub-registry";
 
 export type MarketInterest = "low" | "modest" | "warm" | "high";
@@ -43,6 +46,9 @@ export interface ValuationEstimate {
   basis: string;
   /** 0–5 value drivers. Never specific fabricated sales. */
   factors: Factor[];
+  /** Real, CITED comparable listings / sales found by web search (0–6). Each
+   *  carries a source URL; uncited comps are dropped. */
+  comps: Comp[];
   /** Indicative confidence — capped at "moderate". */
   confidence: "low" | "moderate";
 }
@@ -66,23 +72,28 @@ export class StubValuationAdapter implements ValuationAdapter {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
+/** Web search runs an agentic loop server-side — allow generous headroom, then fall
+ *  back to the F-8 "under expert review" default rather than hang the pipeline. */
+const VALUATION_TIMEOUT_MS = 45_000;
 
 const MARKET_INTEREST: readonly MarketInterest[] = ["low", "modest", "warm", "high"];
 const FACTOR_KINDS: readonly Factor["kind"][] = ["lift", "hold", "decide", "info"];
 
 const VALUATION_SYSTEM = [
-  "You are the valuation stage of the veradis provenance engine. You produce an INDICATIVE fair-market-value estimate for a collectable object from its resolved catalogue identity and its condition / provenance signals.",
-  "This is NOT a certified appraisal. It is an indicative estimate that a human expert will confirm. Write for an owner who wants an honest ballpark, not false precision.",
+  "You are the valuation stage of the veradis provenance engine. You produce an INDICATIVE fair-market-value estimate for a collectable object, grounded in REAL comparable listings and sales you find with web search.",
+  "This is NOT a certified appraisal. It is an indicative estimate that a human expert will confirm. Write for an owner who wants an honest, market-grounded ballpark.",
+  "METHOD:",
+  "- USE web search to find the SAME object (or the closest comparable) currently listed or recently sold — dealers, eBay (sold + asking), auction results, the issuer's own price if still sold. Search by the specific identity (issuer, year, exact model / SKU / commemorative, metal).",
+  "- Price the range FROM those comparables. Return them as `comps` so the owner can see the evidence.",
   "HARD RULES:",
-  "- Give a WIDE, honest range. Collectables trade in ranges; never imply precision you do not have. A common item can still have a modest range, but it must be realistic for that item.",
-  "- Ground the range in the object's identity (type, year, issuer, mintage / rarity, metal), its finish / condition, and its provenance / packaging. State that grounding in ONE line as `basis`.",
-  "- You reason from general catalogue and market knowledge. You do NOT have a live auction feed. Do NOT claim you searched the market. Do NOT invent specific comparable sales (no auction house, lot, date, or hammer price). Comparable sales are handled elsewhere.",
-  `- marketInterest: your honest read of demand — one of ${MARKET_INTEREST.join(", ")}.`,
-  "- factors: 2 to 5 value drivers, each {name, kind, effect}. kind is one of lift, hold, decide, info. Include at least one `info` factor noting the estimate is indicative and not based on live comparable sales.",
+  "- Every comp MUST have a real source `url` you actually saw in search results. NEVER invent a sale, price, lot, date, or URL. If you found no usable comps, return an empty comps array and say so — do not fabricate.",
+  "- Give a defensible range. If comps cluster, the range can be tight; if sparse, keep it wide. State the grounding in ONE line as `basis` (e.g. 'from 3 eBay sold + 1 dealer listing').",
+  `- marketInterest: your honest read of demand from what you saw — one of ${MARKET_INTEREST.join(", ")}.`,
+  "- factors: 2 to 5 value drivers, each {name, kind, effect}. kind is one of lift, hold, decide, info.",
   "- confidence: only `low` or `moderate`. Never higher — this is indicative.",
-  "- Express fmvLo and fmvHi as plain numbers (no currency symbols, no thousands separators) in the requested currency, with fmvLo <= fmvHi and both > 0.",
-  '- If you cannot form a defensible estimate (identity too thin or unknown), return {"noEstimate": true}. Better no number than a fabricated one.',
-  'Return ONLY a JSON object, nothing outside it: {"fmvLo": number, "fmvHi": number, "marketInterest": string, "basis": string, "factors": [{"name": string, "kind": string, "effect": string}], "confidence": string}  OR  {"noEstimate": true}.',
+  "- Express fmvLo and fmvHi as plain numbers (no symbols, no separators) in the requested currency, fmvLo <= fmvHi, both > 0.",
+  '- If you cannot form a defensible estimate, return {"noEstimate": true}.',
+  'Return ONLY a JSON object as your FINAL message: {"fmvLo": number, "fmvHi": number, "marketInterest": string, "basis": string, "comps": [{"source": string, "venue": string, "date": string, "result": string, "url": string}], "factors": [{"name": string, "kind": string, "effect": string}], "confidence": string}  OR  {"noEstimate": true}. `result` is the price seen (e.g. "CAD 95 sold" / "USD 120 asking").',
 ].join("\n");
 
 function valuationUserText(req: ValuationRequest): string {
@@ -111,6 +122,7 @@ interface RawValuationJson {
   fmvHi?: unknown;
   marketInterest?: unknown;
   basis?: unknown;
+  comps?: unknown;
   factors?: unknown;
   confidence?: unknown;
 }
@@ -124,12 +136,21 @@ function num(v: unknown): number | null {
   return null;
 }
 
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+
 /** Defensive parse of Claude's JSON into a ValuationEstimate. Returns null when
  *  the payload is unusable or the band is not defensible — the caller then keeps
- *  the F-8 "under expert review" default. `comps` are never accepted here. */
+ *  the F-8 "under expert review" default. Comps are accepted ONLY when cited with
+ *  a real http(s) URL (no fabricated sales). */
 export function parseValuationJson(text: string, currency: string): ValuationEstimate | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const raw = (fenced ? fenced[1] : text).trim();
+  let raw = (fenced ? fenced[1] : text).trim();
+  // The web-search response can wrap the JSON in prose — take the outermost object.
+  if (!raw.startsWith("{")) {
+    const s = raw.indexOf("{");
+    const e = raw.lastIndexOf("}");
+    if (s >= 0 && e > s) raw = raw.slice(s, e + 1);
+  }
   let parsed: RawValuationJson;
   try {
     parsed = JSON.parse(raw) as RawValuationJson;
@@ -170,6 +191,25 @@ export function parseValuationJson(text: string, currency: string): ValuationEst
       if (factors.length >= 5) break;
     }
   }
+  // Comps: accept ONLY cited ones (a real http(s) URL). An uncited "sale" is dropped.
+  const comps: Comp[] = [];
+  if (Array.isArray(parsed.comps)) {
+    for (const c of parsed.comps as unknown[]) {
+      const cc = c as Record<string, unknown> | null;
+      const url = str(cc?.url);
+      if (!cc || !/^https?:\/\//i.test(url)) continue;
+      comps.push({
+        source: str(cc.source) || "Listing",
+        venue: str(cc.venue),
+        date: str(cc.date),
+        result: str(cc.result),
+        basis: str(cc.basis) || "web search",
+        url,
+      });
+      if (comps.length >= 6) break;
+    }
+  }
+
   // Always carry the honesty caveat as an info factor, even if the model omitted
   // it — making room within the 5-factor cap if the model filled every slot.
   if (!factors.some((f) => f.kind === "info")) {
@@ -177,11 +217,13 @@ export function parseValuationJson(text: string, currency: string): ValuationEst
     factors.push({
       name: "Indicative estimate",
       kind: "info",
-      effect: "Machine estimate, not based on live comparable sales — an expert confirms the firm band.",
+      effect: comps.length
+        ? `Grounded in ${comps.length} cited comparable${comps.length > 1 ? "s" : ""} — an expert confirms the firm band.`
+        : "No live comparable sales found — estimate from catalogue knowledge; an expert confirms.",
     });
   }
 
-  return { currency, fmvLo, fmvHi, marketInterest, basis, factors, confidence };
+  return { currency, fmvLo, fmvHi, marketInterest, basis, factors, comps, confidence };
 }
 
 export class ClaudeValuationAdapter implements ValuationAdapter {
@@ -193,6 +235,8 @@ export class ClaudeValuationAdapter implements ValuationAdapter {
   ) {}
 
   async estimate(req: ValuationRequest): Promise<ValuationEstimate | null> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), VALUATION_TIMEOUT_MS);
     let res: Response;
     try {
       res = await fetch(ANTHROPIC_URL, {
@@ -202,27 +246,33 @@ export class ClaudeValuationAdapter implements ValuationAdapter {
           "anthropic-version": ANTHROPIC_VERSION,
           "content-type": "application/json",
         },
+        signal: ctrl.signal,
         body: JSON.stringify({
           model: this.model,
-          max_tokens: 900,
+          max_tokens: 3000,
           system: VALUATION_SYSTEM,
+          // Server-side web search — the model finds and cites real comparables.
+          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
           messages: [{ role: "user", content: valuationUserText(req) }],
         }),
       });
     } catch (e) {
-      // Network / fetch failure — degrade to the F-8 default, never crash.
+      // Network / fetch failure / timeout — degrade to the F-8 default, never crash.
       console.warn(`valuation:claude request failed — ${(e as Error).message}`);
       return null;
+    } finally {
+      clearTimeout(timer);
     }
     if (!res.ok) {
       console.warn(`valuation:claude ${res.status} ${await res.text().catch(() => "")}`);
       return null;
     }
     const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+    // The final answer is in the text blocks; web_search_tool_result blocks are skipped.
     const text = (data.content ?? [])
       .filter((b) => b.type === "text")
       .map((b) => b.text ?? "")
-      .join("")
+      .join("\n")
       .trim();
     return parseValuationJson(text, req.currency);
   }
