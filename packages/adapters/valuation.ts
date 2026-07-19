@@ -235,11 +235,21 @@ export class ClaudeValuationAdapter implements ValuationAdapter {
   ) {}
 
   async estimate(req: ValuationRequest): Promise<ValuationEstimate | null> {
+    // Try with web search (real cited comps). If the search call ERRORS (e.g. the
+    // tool is unavailable), fall back to a knowledge-only estimate so we never
+    // REGRESS to no valuation. A clean "noEstimate" is honoured, not retried.
+    const searched = await this.call(req, true);
+    if (searched.ok) return searched.value;
+    const plain = await this.call(req, false);
+    return plain.ok ? plain.value : null;
+  }
+
+  private async call(req: ValuationRequest, useSearch: boolean): Promise<{ ok: boolean; value: ValuationEstimate | null }> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), VALUATION_TIMEOUT_MS);
-    let res: Response;
+    const tag = useSearch ? "search" : "plain";
     try {
-      res = await fetch(ANTHROPIC_URL, {
+      const res = await fetch(ANTHROPIC_URL, {
         method: "POST",
         headers: {
           "x-api-key": this.apiKey,
@@ -249,32 +259,30 @@ export class ClaudeValuationAdapter implements ValuationAdapter {
         signal: ctrl.signal,
         body: JSON.stringify({
           model: this.model,
-          max_tokens: 3000,
+          max_tokens: useSearch ? 3000 : 900,
           system: VALUATION_SYSTEM,
-          // Server-side web search — the model finds and cites real comparables.
-          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
+          ...(useSearch ? { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] } : {}),
           messages: [{ role: "user", content: valuationUserText(req) }],
         }),
       });
+      if (!res.ok) {
+        console.warn(`valuation:claude ${tag} ${res.status} ${await res.text().catch(() => "")}`);
+        return { ok: false, value: null };
+      }
+      const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+      // The final answer is in the text blocks; web_search_tool_result blocks are skipped.
+      const text = (data.content ?? [])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text ?? "")
+        .join("\n")
+        .trim();
+      return { ok: true, value: parseValuationJson(text, req.currency) };
     } catch (e) {
-      // Network / fetch failure / timeout — degrade to the F-8 default, never crash.
-      console.warn(`valuation:claude request failed — ${(e as Error).message}`);
-      return null;
+      console.warn(`valuation:claude ${tag} request failed — ${(e as Error).message}`);
+      return { ok: false, value: null };
     } finally {
       clearTimeout(timer);
     }
-    if (!res.ok) {
-      console.warn(`valuation:claude ${res.status} ${await res.text().catch(() => "")}`);
-      return null;
-    }
-    const data = (await res.json()) as { content?: { type: string; text?: string }[] };
-    // The final answer is in the text blocks; web_search_tool_result blocks are skipped.
-    const text = (data.content ?? [])
-      .filter((b) => b.type === "text")
-      .map((b) => b.text ?? "")
-      .join("\n")
-      .trim();
-    return parseValuationJson(text, req.currency);
   }
 }
 
