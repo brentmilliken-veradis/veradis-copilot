@@ -96,6 +96,10 @@ export async function deliverReport(
     status: "delivered",
     file_path: filePath,
     pcs_score: !suppressScore && version.composite != null ? Math.round(version.composite) : undefined,
+    // Tier drives the account's colour chip. Always written (a capped report's
+    // 'flagged' and a downgrade's lower tier are both honest); only the bare
+    // NUMBER is suppressed above.
+    tier: version.tier ?? undefined,
     // A2 (defense-in-depth): a capped report can never be confirmed and so
     // never carries an expert band — but cap-guard the valuation too, for
     // symmetry with the score, so a cap can never leak a bare number either way.

@@ -198,7 +198,7 @@ function heroBlock(s: ReportSnapshot, images: ReportImage[]): string {
     : `<div class="hero-ph"><span class="hero-ph-mark">◆</span><span>${s.evidence.length} photographs on file — hashed at intake</span></div>`;
 
   const tiles = (images.length ? images : s.evidence.map((e) => ({ slot: e.slot, label: undefined, dataUri: "" })))
-    .slice(0, 6)
+    .slice(0, 12) // one tile per photo (the strip wraps); bounded only as a runaway guard
     .map((t) => {
       const label = esc((("label" in t && t.label) || humanize(t.slot)).toUpperCase());
       const inner = t.dataUri
