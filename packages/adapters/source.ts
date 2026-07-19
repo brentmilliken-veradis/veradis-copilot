@@ -115,7 +115,9 @@ export function watchChartsAdapter(scenario: SourceScenario = {}): SourceAdapter
 // non-200, no match) degrades to "not matched" — never crashes the pipeline.
 
 const NUMISTA_BASE = "https://api.numista.com/v3";
-const NUMISTA_TIMEOUT_MS = 8000;
+const NUMISTA_TIMEOUT_MS = 12000;
+
+const sleep = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
 /** veradis category → Numista `category` query value. */
 const NUMISTA_CATEGORY: Partial<Record<Category, string>> = { coins: "coin" };
 
@@ -157,25 +159,34 @@ interface NumistaType {
   mints?: { name?: string }[];
 }
 
-async function numistaGet(path: string, apiKey: string): Promise<unknown | null> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), NUMISTA_TIMEOUT_MS);
-  try {
-    const r = await fetch(`${NUMISTA_BASE}${path}`, {
-      headers: { "Numista-API-Key": apiKey, Accept: "application/json" },
-      signal: ctrl.signal,
-    });
-    if (!r.ok) {
-      console.warn(`numista ${r.status} ${path}`);
-      return null;
+// Retries transient failures (network error, timeout, 429, 5xx) with a short
+// backoff — a single dropped call must not silently starve identity and make the
+// score non-deterministic. Permanent 4xx (bad key, not found) fail fast. `attempts`
+// defaults to 1; the identity-critical SEARCH passes more, the detail lookup (whose
+// failure is tolerable) keeps 1.
+async function numistaGet(path: string, apiKey: string, attempts = 1): Promise<unknown | null> {
+  for (let i = 0; i < attempts; i++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), NUMISTA_TIMEOUT_MS);
+    try {
+      const r = await fetch(`${NUMISTA_BASE}${path}`, {
+        headers: { "Numista-API-Key": apiKey, Accept: "application/json" },
+        signal: ctrl.signal,
+      });
+      if (r.ok) return (await r.json()) as unknown;
+      if (r.status !== 429 && r.status < 500) {
+        console.warn(`numista ${r.status} ${path} (permanent — not retried)`);
+        return null; // bad key / not found — retrying cannot help
+      }
+      console.warn(`numista ${r.status} ${path} (attempt ${i + 1}/${attempts})`);
+    } catch (e) {
+      console.warn(`numista request failed ${path} (attempt ${i + 1}/${attempts}) — ${(e as Error).message}`);
+    } finally {
+      clearTimeout(t);
     }
-    return (await r.json()) as unknown;
-  } catch (e) {
-    console.warn(`numista request failed ${path} — ${(e as Error).message}`);
-    return null;
-  } finally {
-    clearTimeout(t);
+    if (i < attempts - 1) await sleep(250 * (i + 1));
   }
+  return null;
 }
 
 function denomText(t: NumistaType): string {
@@ -225,9 +236,12 @@ export class NumistaSourceAdapter implements SourceAdapter {
       .trim();
     if (!q) return null;
 
+    // Identity-critical: retry the search so a transient failure can't silently
+    // starve identity (3 attempts). The detail call below tolerates failure.
     const search = (await numistaGet(
       `/types?q=${encodeURIComponent(q)}&category=${catParam}&lang=en&count=8`,
       this.apiKey,
+      3,
     )) as { types?: NumistaType[] } | null;
     const types = search?.types ?? [];
     const none: ObjectResolution = { matched: false, sourceName: this.name, tier: this.tier, confirmedKeys: {} };
