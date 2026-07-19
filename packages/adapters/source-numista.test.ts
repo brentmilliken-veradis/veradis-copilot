@@ -107,6 +107,39 @@ describe("NumistaSourceAdapter.resolveObject", () => {
     expect(res?.matched).toBe(false);
   });
 
+  it("RETRIES a transient search failure (500) and still resolves — no silent identity drop", async () => {
+    let searchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes("/types/")) return { ok: true, status: 200, async text() { return JSON.stringify(DOLLAR_DETAIL); }, async json() { return DOLLAR_DETAIL; } };
+        searchCalls++;
+        if (searchCalls === 1) return { ok: false, status: 500, async text() { return "err"; }, async json() { return {}; } };
+        const body = { count: 2, types: [QUARTER, DOLLAR] };
+        return { ok: true, status: 200, async text() { return JSON.stringify(body); }, async json() { return body; } };
+      }),
+    );
+    const res = await new NumistaSourceAdapter("k").resolveObject({ attributes: POPPY_ATTRS, category: "coins", identityKeys: KEYS });
+    expect(res?.matched).toBe(true);
+    expect(searchCalls).toBeGreaterThanOrEqual(2); // it retried rather than dropping identity
+  });
+
+  it("fails fast on a PERMANENT 4xx (bad key / 401) — no wasted retries", async () => {
+    let searchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/types/")) return { ok: true, status: 200, async text() { return "{}"; }, async json() { return {}; } };
+        searchCalls++;
+        return { ok: false, status: 401, async text() { return "unauthorized"; }, async json() { return {}; } };
+      }),
+    );
+    const res = await new NumistaSourceAdapter("k").resolveObject({ attributes: POPPY_ATTRS, category: "coins", identityKeys: KEYS });
+    expect(res?.matched).toBe(false);
+    expect(searchCalls).toBe(1); // 401 is not retried
+  });
+
   it("returns null for a category Numista does not serve", async () => {
     mockFetch(() => ({ count: 0, types: [] }));
     const res = await new NumistaSourceAdapter("k").resolveObject({ attributes: { title: "x" }, category: "watches", identityKeys: [] });
