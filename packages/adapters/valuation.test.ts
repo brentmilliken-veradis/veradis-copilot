@@ -60,6 +60,35 @@ describe("parseValuationJson", () => {
   it("returns null on unparseable output (caller keeps the F-8 default)", () => {
     expect(parseValuationJson("I think it's worth about a hundred bucks", "CAD")).toBeNull();
   });
+
+  it("accepts CITED comps and drops uncited ones (no fabricated sales)", () => {
+    const est = parseValuationJson(
+      JSON.stringify({
+        fmvLo: 60, fmvHi: 140, marketInterest: "modest", basis: "from comps", confidence: "moderate",
+        comps: [
+          { source: "eBay", venue: "eBay (sold)", date: "2025-03", result: "CAD 95 sold", url: "https://www.ebay.com/itm/123" },
+          { source: "Fabricated House", venue: "?", date: "?", result: "CAD 999 hammer" }, // no url → dropped
+        ],
+        factors: [],
+      }),
+      "CAD",
+    )!;
+    expect(est.comps).toHaveLength(1);
+    expect(est.comps[0].url).toContain("ebay.com");
+    expect(est.factors.some((f) => f.kind === "info" && /cited comparable/i.test(f.effect ?? ""))).toBe(true);
+  });
+
+  it("a valid estimate with no comps still parses (comps default to [], honest caveat)", () => {
+    const est = parseValuationJson(JSON.stringify({ fmvLo: 10, fmvHi: 20, marketInterest: "low", basis: "b", factors: [], confidence: "low" }), "CAD")!;
+    expect(est.comps).toEqual([]);
+    expect(est.factors.some((f) => f.kind === "info" && /no live comparable/i.test(f.effect ?? ""))).toBe(true);
+  });
+
+  it("extracts the JSON object even when the web-search reply wraps it in prose", () => {
+    const est = parseValuationJson('Here is my estimate based on what I found:\n{"fmvLo":60,"fmvHi":140,"marketInterest":"modest","basis":"b","factors":[],"confidence":"moderate","comps":[]}\nHope that helps.', "CAD");
+    expect(est).not.toBeNull();
+    expect(est!.fmvHi).toBe(140);
+  });
 });
 
 describe("StubValuationAdapter", () => {

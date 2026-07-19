@@ -146,6 +146,7 @@ const EST: ValuationEstimate = {
     { name: "Limited mintage (25,000)", kind: "lift", effect: "scarcity supports the upper range" },
     { name: "Indicative estimate", kind: "info", effect: "not based on live comparable sales" },
   ],
+  comps: [],
   confidence: "moderate",
 };
 
