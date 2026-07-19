@@ -172,8 +172,23 @@ async function downloadPhotos(deps: ReportPollerDeps, obj: AccountsObjectRow): P
 
 /** F-5a: production attempts before a row is marked terminally failed. */
 export const MAX_PRODUCTION_ATTEMPTS = 3;
-/** F-5a: a 'producing' claim older than this is presumed crashed → reclaim. */
-export const STALE_CLAIM_MS = 15 * 60 * 1000;
+/** F-5a: a 'producing' claim older than this is presumed crashed → reclaim. Must
+ *  stay comfortably above the function's maxDuration (300s) so a claim that is
+ *  still legitimately in-flight on an overlapping tick is never reclaimed. */
+export const STALE_CLAIM_MS = 8 * 60 * 1000;
+/** Reliability: how many reports one tick produces CONCURRENTLY. A backlog used
+ *  to trickle out one-at-a-time (each report is vision + a web-search-backed
+ *  appraise, ~1–2 min), so a handful of orders took many ticks. Bounded to keep
+ *  memory + upstream API pressure sane; the atomic order-claim (createOrder PK,
+ *  R-3 reclaim) keeps it correct across ticks too. */
+export const POLL_CONCURRENCY = 3;
+/** Reliability: stop STARTING new reports this many ms into a tick. A report is
+ *  only claimed when it can finish before the function's maxDuration — so we
+ *  never claim-then-crash mid-production (the old failure that stranded an order
+ *  'producing' for a full STALE_CLAIM_MS). Rows not started are left
+ *  in_production and picked up next tick. Sized to leave headroom under the 300s
+ *  maxDuration for the slowest in-flight report to complete. */
+export const POLL_START_BUDGET_MS = 150 * 1000;
 /** B4: delivery (accounts write-back) retries on an already-produced order
  *  before we give up. Production is capped by MAX_PRODUCTION_ATTEMPTS; delivery
  *  had no cap, so a permanently-failing write-back retried every tick forever. */
@@ -434,24 +449,58 @@ export interface PollSummary {
   refunded: number;
   skipped: number;
   failed: number;
+  /** Rows the queue held but this tick did not START (concurrency + start-budget) —
+   *  they stay in_production and are produced next tick. Logged, never silent. */
+  deferred: number;
   /** R-5: curator-review emails re-sent by the queue-independent sweep. */
   curatorEmailsResent: number;
   results: ProcessedReport[];
 }
 
-/** One cron tick: drain the in_production queue (failures isolated per row),
- *  then run the curator-email sweep (R-5). */
-export async function pollReports(deps: ReportPollerDeps): Promise<PollSummary> {
+/** Tuning overrides (tests inject a tiny budget / concurrency; production uses
+ *  the module defaults sized to the 300s function maxDuration). */
+export interface PollOptions {
+  concurrency?: number;
+  startBudgetMs?: number;
+}
+
+/** One cron tick: drain the in_production queue with BOUNDED CONCURRENCY, only
+ *  starting a report while there is enough of the function budget left for it to
+ *  finish (so we never claim-then-crash mid-production), then run the
+ *  curator-email sweep (R-5). Per-row failures stay isolated. */
+export async function pollReports(deps: ReportPollerDeps, opts: PollOptions = {}): Promise<PollSummary> {
+  const now = deps.now ?? (() => new Date());
   const rows = await deps.accounts.listInProductionReports();
+  const concurrency = Math.max(1, opts.concurrency ?? POLL_CONCURRENCY);
+  const deadline = now().getTime() + (opts.startBudgetMs ?? POLL_START_BUDGET_MS);
+
   const results: ProcessedReport[] = [];
-  for (const row of rows) {
-    try {
-      results.push(await processAccountsReport(deps, row));
-    } catch (e) {
-      console.error(`report poller: ${row.id} failed:`, e);
-      results.push({ reportId: row.id, outcome: "failed", reason: (e as Error).message });
+  let next = 0;
+  let deferred = 0;
+
+  // Worker pool: each worker pulls the next row until the queue is drained or the
+  // start-budget is spent. Index handoff is synchronous (single-threaded JS
+  // between awaits), so no two workers ever take the same row.
+  async function worker(): Promise<void> {
+    for (;;) {
+      if (next >= rows.length) return;
+      if (now().getTime() >= deadline) {
+        deferred += rows.length - next; // count the untouched tail exactly once
+        next = rows.length;
+        return;
+      }
+      const row = rows[next++];
+      try {
+        results.push(await processAccountsReport(deps, row));
+      } catch (e) {
+        console.error(`report poller: ${row.id} failed:`, e);
+        results.push({ reportId: row.id, outcome: "failed", reason: (e as Error).message });
+      }
     }
   }
+  await Promise.all(Array.from({ length: Math.min(concurrency, rows.length || 1) }, () => worker()));
+  if (deferred > 0) console.warn(`report poller: deferred ${deferred} row(s) to the next tick (start-budget spent)`);
+
   // Cleanup 2: the sweep must never sink a tick — row side effects above have
   // already committed. A sweep-level failure (e.g. listReportsByStatus throws)
   // is logged and swallowed; the tick still returns its summary.
@@ -467,6 +516,7 @@ export async function pollReports(deps: ReportPollerDeps): Promise<PollSummary> 
     refunded: results.filter((r) => r.outcome === "refunded").length,
     skipped: results.filter((r) => r.outcome === "skipped").length,
     failed: results.filter((r) => r.outcome === "failed").length,
+    deferred,
     curatorEmailsResent,
     results,
   };

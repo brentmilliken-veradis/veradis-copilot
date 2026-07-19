@@ -540,3 +540,78 @@ describe("pollReports", () => {
     expect((await d.repo.getOrder("rep-1"))?.productionState).toBe("produced"); // not given up yet
   });
 });
+
+// ---- Reliability: bounded concurrency + start-budget (no claim-then-crash) ----
+
+function seedMany(accounts: FakeAccounts, n: number): void {
+  for (let i = 0; i < n; i++) {
+    accounts.queue.push({ id: `rep-${i}`, user_id: "user-1", object_id: `obj-${i}`, type: "verify", status: "in_production" });
+    accounts.objects.set(`obj-${i}`, {
+      id: `obj-${i}`, user_id: "user-1", title: `Painting ${i}`, maker: "E. J. Hughes",
+      year: "1946", category: "Painting", notes: null, photo_paths: [`user-1/front-${i}.jpg`],
+    });
+    accounts.photos.set(`user-1/front-${i}.jpg`, JPEG);
+  }
+  accounts.profiles.set("user-1", { id: "user-1", email: "collector@example.com", full_name: "Alex Collector" });
+}
+
+// Wraps the stub to record how many analyses overlap — proves real concurrency.
+class CountingVision extends StubVisionAdapter {
+  live = 0;
+  max = 0;
+  async analyze(req: Parameters<StubVisionAdapter["analyze"]>[0]) {
+    this.live++;
+    this.max = Math.max(this.max, this.live);
+    await new Promise((r) => setTimeout(r, 5));
+    this.live--;
+    return super.analyze(req);
+  }
+}
+
+describe("pollReports — reliability (concurrency + start-budget)", () => {
+  beforeEach(() => resetStubRegistry());
+
+  it("defers the whole queue when the start-budget is spent — never claims a row it can't finish", async () => {
+    const accounts = new FakeAccounts();
+    seedMany(accounts, 3);
+    const summary = await pollReports(deps(accounts), { startBudgetMs: 0 });
+    expect(summary.polled).toBe(3);
+    expect(summary.deferred).toBe(3);
+    expect(summary.delivered + summary.refunded + summary.failed).toBe(0);
+    // Nothing was claimed or written — the rows just wait for the next tick.
+    expect(accounts.patches).toHaveLength(0);
+    expect(accounts.queue.every((r) => r.status === "in_production")).toBe(true);
+  });
+
+  it("produces every queued row exactly once under bounded concurrency", async () => {
+    const accounts = new FakeAccounts();
+    seedMany(accounts, 5);
+    const summary = await pollReports(deps(accounts), { concurrency: 3 });
+    expect(summary.polled).toBe(5);
+    expect(summary.deferred).toBe(0);
+    expect(summary.results).toHaveLength(5);
+    expect(new Set(summary.results.map((r) => r.reportId)).size).toBe(5); // no row processed twice
+    expect(accounts.queue.every((r) => r.status !== "in_production")).toBe(true); // all resolved
+  });
+
+  it("actually runs reports in parallel up to the cap (and only up to it)", async () => {
+    const accounts = new FakeAccounts();
+    seedMany(accounts, 4);
+    const d = deps(accounts);
+    const vision = new CountingVision();
+    d.adapters.vision = vision;
+    await pollReports(d, { concurrency: 3 });
+    expect(vision.max).toBeGreaterThan(1); // more than one at a time
+    expect(vision.max).toBeLessThanOrEqual(3); // never more than the cap
+  });
+
+  it("serialises to one at a time when concurrency is 1", async () => {
+    const accounts = new FakeAccounts();
+    seedMany(accounts, 3);
+    const d = deps(accounts);
+    const vision = new CountingVision();
+    d.adapters.vision = vision;
+    await pollReports(d, { concurrency: 1 });
+    expect(vision.max).toBe(1);
+  });
+});

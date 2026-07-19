@@ -11,6 +11,11 @@ import { pollReports } from "@/packages/pollers/reports";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// A single report is vision + a web-search-backed appraise (~1–2 min). The
+// Vercel default (60s) killed the function mid-report, stranding the order
+// 'producing'. Give the tick real headroom (Pro max) so reports finish and the
+// poller can clear several per tick. The poller's start-budget stays under this.
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const denied = checkCronAuth(request); // F-3: fails closed without CRON_SECRET
