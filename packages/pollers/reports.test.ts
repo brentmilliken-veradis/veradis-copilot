@@ -157,12 +157,14 @@ describe("pollReports", () => {
     expect(accounts.uploads[0].html).toContain("Provenance Confidence Score");
     const paintingPatch = accounts.patches[0].patch;
     expect(paintingPatch.status).toBe("delivered");
-    // R-4: a painting is an uncalibrated (capped) category — the structured
-    // pcs_score is withheld; the delivered HTML carries the capped verdict.
-    if (paintingPatch.status === "delivered") expect(paintingPatch.pcs_score).toBeUndefined();
-    expect(accounts.uploads[0].html).toContain("This category is not yet calibrated");
+    // Art is now a CALIBRATED category — the painting carries a real score, not a
+    // capped one: the structured pcs_score is written and the HTML no longer says
+    // "not yet calibrated". (With no art resolver / provenance in this stub-only
+    // deps, it scores an honest non-Gold tier — the artist gate isn't met here.)
+    if (paintingPatch.status === "delivered") expect(typeof paintingPatch.pcs_score).toBe("number");
+    expect(accounts.uploads[0].html).not.toContain("This category is not yet calibrated");
 
-    // Copilot side: order (id = accounts report id) + provisional report + EMAIL B.
+    // Copilot side: order (id = accounts report id) + report + EMAIL B.
     const order = await d.repo.getOrder("rep-1");
     expect(order?.category).toBe("art");
     const report = (await d.repo.listReports()).find((r) => r.orderId === "rep-1");
