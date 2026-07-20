@@ -510,3 +510,175 @@ export async function routeLookup(
   const eligible = adapters.filter((a) => a.categories.includes(l.category));
   return Promise.all(eligible.map((a) => a.lookup(l)));
 }
+
+// ---- Fine-art identity: artist + work resolution via web search (E-art) ----
+// A unique work has no reference number to resolve, so identity is different: the
+// resolver CONFIRMS (a) that the named artist is a real, DOCUMENTED artist — the
+// gate for the provenance-first Gold path — and (b) the specific work where a
+// record exists (catalogue raisonné, auction lot, exhibition/museum). It reads
+// authorship from the DOCUMENTARY RECORD only; it NEVER asserts the physical
+// object is authentic or autograph — that is connoisseurship + provenance +
+// science, and stays behind the honesty ceiling ("not a certificate of
+// authenticity"). Cites its sources (falsifiability). Activates on VISION_API_KEY
+// / ANTHROPIC_API_KEY (web search); without it the catalogue-raisonné stub is used.
+
+const ART_ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const ART_ANTHROPIC_VERSION = "2023-06-01";
+const ART_TIMEOUT_MS = 45_000;
+
+const astr = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+
+/** Catalogue-raisonné / estate stub (Tier-1 identity ground truth for art). */
+export function catalogueRaisonneAdapter(scenario: SourceScenario = {}): SourceAdapter {
+  return new StubSourceAdapter("Catalogue raisonné", 1, "ground_truth", ["art"], "ART_ARCHIVE_API_KEY", scenario);
+}
+
+const ART_SYSTEM = [
+  "You are the identity stage of the veradis provenance engine for FINE ART. Given a claimed artist, title, year, medium and dimensions (read from the owner + the photos), you CONFIRM catalogue identity using web search over authoritative sources.",
+  "TWO jobs:",
+  "1. ARTIST: confirm the named artist is a REAL, DOCUMENTED artist — found in an established record (a museum collection, an auction house, askART/artnet, a gallery that represents them, a catalogue raisonné). This is the gate.",
+  "2. WORK: where a record of THIS specific work exists (a catalogue raisonné number, an auction lot, an exhibition/museum entry that matches the title, year, medium and dimensions), confirm it.",
+  "HARD RULES (honesty — a wrong confirmation is worse than none):",
+  "- You confirm the DOCUMENTARY RECORD only. You NEVER state the physical object is genuine, authentic, or autograph — attribution of the object is not yours to assert.",
+  "- Confirm `artist` ONLY when the artist is clearly documented. Confirm `title`/`year` ONLY when a record of the specific work clearly matches. If a field disagrees with what the owner gave, put the source's value in `corrected`, not `confirmed`.",
+  "- NEVER invent an artist, work, record, or URL. You MUST return a real `url` you actually saw. No documented artist or no URL → {\"matched\": false}.",
+  'Return ONLY a JSON object: {"matched": boolean, "url": string, "confirmed": {"artist"?: string, "title"?: string, "year"?: string, "medium"?: string}, "corrected": {<key>: <source value>}, "note": string}. On no clear match: {"matched": false}.',
+].join("\n");
+
+interface RawArtResolution {
+  matched?: unknown;
+  url?: unknown;
+  confirmed?: unknown;
+  corrected?: unknown;
+}
+
+/** Parse Claude's art-resolution JSON into an ObjectResolution. Honesty guards: a
+ *  match REQUIRES a cited http(s) URL AND a confirmed `artist` (the documented-
+ *  artist gate — the discriminating fact for the provenance-first Gold path);
+ *  only identity keys are read; a disagreement is demoted to an advisory
+ *  correction, never credited. Never encodes an authorship claim about the object. */
+export function parseArtResolution(
+  text: string,
+  attributes: Record<string, string>,
+  identityKeys: string[],
+): ObjectResolution | null {
+  const none: ObjectResolution = { matched: false, sourceName: "Art reference", tier: 1, confirmedKeys: {} };
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  let raw = (fenced ? fenced[1] : text).trim();
+  if (!raw.startsWith("{")) {
+    const s = raw.indexOf("{");
+    const e = raw.lastIndexOf("}");
+    if (s >= 0 && e > s) raw = raw.slice(s, e + 1);
+  }
+  let parsed: RawArtResolution;
+  try {
+    parsed = JSON.parse(raw) as RawArtResolution;
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || parsed.matched !== true) return none;
+  const url = astr(parsed.url);
+  if (!/^https?:\/\//i.test(url)) return none; // no citation → no close
+
+  const conf = (parsed.confirmed && typeof parsed.confirmed === "object" ? parsed.confirmed : {}) as Record<string, unknown>;
+  const corr = (parsed.corrected && typeof parsed.corrected === "object" ? parsed.corrected : {}) as Record<string, unknown>;
+  const confirmedKeys: Record<string, string> = {};
+  const correctedKeys: Record<string, string> = {};
+
+  for (const key of identityKeys) {
+    const cv = astr(conf[key]);
+    const declared = attributes[key];
+    if (cv) {
+      if (declared && norm(declared) !== norm(cv)) correctedKeys[key] = cv;
+      else confirmedKeys[key] = declared || cv;
+    }
+    const xv = astr(corr[key]);
+    if (xv && !correctedKeys[key] && (!declared || norm(declared) !== norm(xv))) correctedKeys[key] = xv;
+  }
+
+  // The gate: a match requires the ARTIST confirmed as documented. Without it there
+  // is no identity resolution (and the provenance-first Gold path stays gated).
+  if (!confirmedKeys.artist) return none;
+  return {
+    matched: true,
+    sourceName: "Art reference",
+    url,
+    tier: 1,
+    confirmedKeys,
+    correctedKeys: Object.keys(correctedKeys).length ? correctedKeys : undefined,
+  };
+}
+
+export class ClaudeArtSourceAdapter implements SourceAdapter {
+  name = "Art reference";
+  tier: SourceTier = 1;
+  role = "ground_truth" as const;
+  categories: Category[] = ["art"];
+  constructor(
+    private apiKey: string,
+    private model: string = process.env.VISION_MODEL ?? "claude-opus-4-8",
+  ) {}
+
+  async lookup(): Promise<SourceResult> {
+    return { adapter: this.name, tier: this.tier, role: this.role, matched: false, name: this.name, retrievalState: "pending" };
+  }
+
+  async resolveObject(input: {
+    attributes: Record<string, string>;
+    category: Category;
+    identityKeys: string[];
+  }): Promise<ObjectResolution | null> {
+    const { attributes, category, identityKeys } = input;
+    if (category !== "art") return null;
+    const artist = astr(attributes.artist) || astr(attributes.maker);
+    // Without a named artist there is nothing to confirm — stay silent (identity
+    // falls back to declared/observed, never invented).
+    if (!artist) return null;
+
+    const userText = [
+      `Artist (claimed): ${artist}`,
+      attributes.title ? `Title: ${attributes.title}` : "",
+      attributes.year ? `Year: ${attributes.year}` : "",
+      attributes.medium ? `Medium: ${attributes.medium}` : "",
+      attributes.dimensions ? `Dimensions: ${attributes.dimensions}` : "",
+      "",
+      "Confirm the catalogue identity as the JSON object only.",
+    ].filter(Boolean).join("\n");
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ART_TIMEOUT_MS);
+    try {
+      const res = await fetch(ART_ANTHROPIC_URL, {
+        method: "POST",
+        headers: { "x-api-key": this.apiKey, "anthropic-version": ART_ANTHROPIC_VERSION, "content-type": "application/json" },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: 1500,
+          system: ART_SYSTEM,
+          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }],
+          messages: [{ role: "user", content: userText }],
+        }),
+      });
+      if (!res.ok) {
+        console.warn(`art resolver ${res.status} ${await res.text().catch(() => "")}`);
+        return { matched: false, sourceName: this.name, tier: this.tier, confirmedKeys: {} };
+      }
+      const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+      const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n").trim();
+      return parseArtResolution(text, attributes, identityKeys) ?? { matched: false, sourceName: this.name, tier: this.tier, confirmedKeys: {} };
+    } catch (e) {
+      console.warn(`art resolver request failed — ${(e as Error).message}`);
+      return { matched: false, sourceName: this.name, tier: this.tier, confirmedKeys: {} };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/** Adapter factory — the web-search artist/work resolver when a web-search key is
+ *  present, else the catalogue-raisonné fixture stub. */
+export function getArtArchiveAdapter(scenario: SourceScenario = {}): SourceAdapter {
+  const key = process.env.VISION_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+  return key ? new ClaudeArtSourceAdapter(key) : catalogueRaisonneAdapter(scenario);
+}

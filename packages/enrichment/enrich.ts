@@ -90,7 +90,18 @@ const MATERIAL_FLAGS = new Set([
   // Luxury / handbag integrity tells (counterfeit, mismatched_stamp are
   // identity/verdict tells, handled outside the material set).
   "replaced_hardware", "rebuilt_restored", "franken_bag",
+  // Fine-art material tell: a photomechanical reproduction is not a painting —
+  // the surface (rosette dot pattern, uniform texture) reads inconsistent, so it
+  // fails Material to Flagged. (Later-added signature / attribution upgrade are
+  // identity tells → ATTRIBUTION_VETO_FLAGS below, not the material set.)
+  "print_as_painting",
 ]);
+
+/** Attribution-fraud tells (fine art): a reproduction presented as an original,
+ *  a later-added signature, or a school/follower upgraded to autograph. These
+ *  put AUTHORSHIP in question, so they veto the complete-provenance Gold lift —
+ *  provenance can never launder a contested attribution to a confident tier. */
+const ATTRIBUTION_VETO_FLAGS = new Set(["print_as_painting", "signature_added", "attribution_upgrade"]);
 
 export async function enrich(
   repo: Repository,
@@ -311,7 +322,19 @@ export async function enrich(
   // A MATERIAL red flag vetoes the complete-timeline lift (and the moot-register
   // clean): a forged COA on a fake must not buy custody credit or clean risk.
   const materialInconsistent = material.some((m) => m.present && m.consistency === "inconsistent");
-  const prov = deriveProvenanceCustody(declaredAttributes.notes, { suppressComplete: materialInconsistent });
+  // Attribution-fraud red flags (a reproduction sold as an original, a later-added
+  // signature, a school/follower upgraded to autograph) veto the Gold lift: a work
+  // whose authorship is in question can never ride provenance to a confident tier.
+  const attributionVeto = input.redFlags.some((f) => ATTRIBUTION_VETO_FLAGS.has(f.key));
+  // Provenance-first, artist-gated (fine art): the complete-provenance Gold lift
+  // applies only when the profile's gate key (e.g. "artist") is CONFIRMED by a
+  // Tier-1 source. A documented chain with an unconfirmed / unverifiable artist
+  // stays Silver — provenance alone can't launder an unknown attribution to Gold.
+  const gateKey = profile.goldGateIdentityKey;
+  const goldGateUnmet = !!gateKey && !(objRes?.matched && !!objRes.confirmedKeys[gateKey]);
+  const prov = deriveProvenanceCustody(declaredAttributes.notes, {
+    suppressComplete: materialInconsistent || attributionVeto || goldGateUnmet,
+  });
   const baseCoverage = input.custodyHint?.coverage ?? 0.5;
   const coverage = Math.min(1, baseCoverage + links.reduce((a, l) => a + l.confidence * 0.1, 0) + prov.coverage);
   const custody: CustodyInput = {

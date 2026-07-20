@@ -1,0 +1,127 @@
+{
+  "category": "art",
+  "version": 1,
+  "binding": "ANCHORS prove the deterministic engine reproduces art-shaped tiers to the digit at the art scaleFactor (5, the SCALE_BY_CATEGORY default). FIELD_GOLDEN are documented reference cases with expert-known market positioning under the provenance-first, artist-gated model: a documented (confirmed) artist + an unbroken documented provenance chain + no attribution red flags -> Gold; a documented artist with no provenance -> Silver; a photomechanical reproduction sold as an original -> Flagged. This is the soft-launch basis; physical owner objects and dealer/auction lots (with expert-assigned tiers) deepen the set as they land. The negative (reproduction) is present per Acceptance B. Honesty ceiling holds absolutely: the engine verifies the documentary record, it never authenticates authorship of the object.",
+  "scale_factor": 5,
+  "anchors": [
+    {
+      "id": "A1",
+      "name": "Documented artist, catalogue + auction provenance, unbroken chain",
+      "raws": {
+        "identity": 84,
+        "custody": 90,
+        "material": 96,
+        "risk": 100
+      },
+      "checkCounts": {
+        "identity": 5,
+        "custody": 5,
+        "material": 3,
+        "risk": 1
+      },
+      "expected": {
+        "composite": 91.2,
+        "ci": {
+          "lo": 80.46,
+          "hi": 94.46
+        },
+        "tier": "gold"
+      }
+    },
+    {
+      "id": "A2",
+      "name": "Documented artist, attributed work, thin provenance",
+      "raws": {
+        "identity": 74,
+        "custody": 60,
+        "material": 92,
+        "risk": 90
+      },
+      "checkCounts": {
+        "identity": 4,
+        "custody": 2,
+        "material": 3,
+        "risk": 1
+      },
+      "expected": {
+        "composite": 76.7,
+        "ci": {
+          "lo": 62.68,
+          "hi": 85.22
+        },
+        "tier": "silver"
+      }
+    },
+    {
+      "id": "A3",
+      "name": "Signed work, minimal documentation",
+      "raws": {
+        "identity": 58,
+        "custody": 48,
+        "material": 78,
+        "risk": 90
+      },
+      "checkCounts": {
+        "identity": 3,
+        "custody": 2,
+        "material": 3,
+        "risk": 1
+      },
+      "expected": {
+        "composite": 64.8,
+        "ci": {
+          "lo": 50.15,
+          "hi": 75.98
+        },
+        "tier": "bronze"
+      }
+    },
+    {
+      "id": "A4",
+      "name": "Photomechanical reproduction presented as an original",
+      "raws": {
+        "identity": 38,
+        "custody": 28,
+        "material": 0,
+        "risk": 90
+      },
+      "checkCounts": {
+        "identity": 3,
+        "custody": 1,
+        "material": 3,
+        "risk": 1
+      },
+      "expected": {
+        "composite": 33.3,
+        "ci": {
+          "lo": 22.16,
+          "hi": 48.37
+        },
+        "tier": "flagged"
+      }
+    }
+  ],
+  "field_golden": [
+    {
+      "id": "FG1",
+      "name": "Documented artist + catalogue/auction provenance + unbroken dealer->owner chain",
+      "expectedTier": "gold",
+      "groundTruthSource": "Reference-case market positioning: a work by a documented artist (museum/auction/askART) with a published catalogue-raisonne or auction record and an unbroken documented provenance chain, no attribution red flags, sits Gold in the market. Verified against the documentary record; NOT an authentication of the object.",
+      "validated": true
+    },
+    {
+      "id": "FG2",
+      "name": "Documented artist, no documented provenance",
+      "expectedTier": "silver",
+      "groundTruthSource": "Reference-case positioning: a confirmed documented artist but no documented provenance chain sits Silver (identity supported, custody unproven) under the artist-gated model.",
+      "validated": true
+    },
+    {
+      "id": "FG3",
+      "name": "Photomechanical reproduction sold as an original painting",
+      "expectedTier": "flagged",
+      "groundTruthSource": "Reference-case negative (Acceptance B): a print / mechanical reproduction presented as an original is a material + attribution fraud and must fail to Flagged regardless of a supplied story.",
+      "validated": true
+    }
+  ]
+}

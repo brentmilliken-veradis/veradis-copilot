@@ -225,3 +225,60 @@ describe("getWatchArchiveAdapter", () => {
     expect(getWatchArchiveAdapter()).toBeInstanceOf(ClaudeWatchSourceAdapter);
   });
 });
+
+import { parseArtResolution, ClaudeArtSourceAdapter, getArtArchiveAdapter } from "./source";
+
+// The fine-art resolver — Tier-1 identity for art. Honesty guards: a close needs
+// a cited URL AND a confirmed ARTIST (the documented-artist gate); a disagreement
+// is demoted to an advisory correction; it never encodes an authorship claim.
+describe("parseArtResolution", () => {
+  const IK = ["artist", "signature_inscription", "title", "medium", "dimensions"];
+  const attrs = { artist: "Nicolas Bott", title: "Alpine II", medium: "Oil on canvas", dimensions: "24 x 36 in" };
+
+  it("confirms a documented artist + matched work with a citation", () => {
+    const res = parseArtResolution(JSON.stringify({
+      matched: true,
+      url: "https://www.askart.com/artist/Nicolas_Bott/x/Nicolas_Bott.aspx",
+      confirmed: { artist: "Nicolas Bott", title: "Alpine II", medium: "Oil on canvas" },
+      note: "Documented BC artist; work matches a gallery record",
+    }), attrs, IK);
+    expect(res?.matched).toBe(true);
+    expect(res?.confirmedKeys).toMatchObject({ artist: "Nicolas Bott", title: "Alpine II" });
+    expect(res?.url).toContain("askart.com");
+  });
+
+  it("refuses to close without a citation URL", () => {
+    expect(parseArtResolution(JSON.stringify({ matched: true, confirmed: { artist: "Nicolas Bott" } }), attrs, IK)?.matched).toBe(false);
+  });
+
+  it("refuses to close when the ARTIST is not confirmed (the gate)", () => {
+    const res = parseArtResolution(JSON.stringify({
+      matched: true, url: "https://example.com/x", confirmed: { title: "Alpine II" },
+    }), attrs, IK);
+    expect(res?.matched).toBe(false);
+  });
+
+  it("demotes a disagreeing field to an advisory correction", () => {
+    const res = parseArtResolution(JSON.stringify({
+      matched: true, url: "https://www.artnet.com/artists/nicolas-bott/",
+      confirmed: { artist: "Nicolas Bott" }, corrected: { year: "1997" },
+    }), { ...attrs, year: "1998" }, [...IK, "year"]);
+    expect(res?.matched).toBe(true);
+    expect(res?.correctedKeys?.year).toBe("1997");
+  });
+
+  it("no documented artist → not matched; malformed → null", () => {
+    expect(parseArtResolution(JSON.stringify({ matched: false }), attrs, IK)?.matched).toBe(false);
+    expect(parseArtResolution("could not resolve the artist", attrs, IK)).toBeNull();
+  });
+});
+
+describe("getArtArchiveAdapter", () => {
+  afterEach(() => { delete process.env.VISION_API_KEY; delete process.env.ANTHROPIC_API_KEY; });
+  it("returns the live resolver when a web-search key is set, else the stub", () => {
+    delete process.env.VISION_API_KEY; delete process.env.ANTHROPIC_API_KEY;
+    expect(getArtArchiveAdapter().name).toBe("Catalogue raisonné"); // stub
+    process.env.VISION_API_KEY = "k";
+    expect(getArtArchiveAdapter()).toBeInstanceOf(ClaudeArtSourceAdapter);
+  });
+});
